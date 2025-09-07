@@ -1,0 +1,99 @@
+Chapter 1: Building Our First Resource (1)
+    Getting the Ball Rolling
+
+    Oh, CRUD! - Defining Basic Actions
+
+    Integrating Actions into LiveViews
+
+Chapter 2: Extending Reasources with Business Logic (33)
+    Reasources and Relationships
+
+    Loading Related Reasource Data
+
+    Structured Data with Validations and Identities
+
+    Deleting All of the Things
+
+    Changing Data with Actions
+
+Chapter 3: Creating a Better Search UI (59)
+    Custom Actions with Arguments
+
+    Dynamically Sorting Artists
+
+    Pagination of Search Results
+
+    No DB field? No Problems, with Calculations
+
+    Relationship Calculations as Aggregates
+
+Chapter 4: Generating APIs Without Writing Code (85)
+    Model Your Domain, Derive the Results
+    
+    Building A JSON REST interface
+
+    Building a GraphQL interface
+
+Chapter 5: Authentication: Who Are You? (107)
+    Introducing AshAuthentication
+
+    Setting Up Password Authentication
+
+    Automatic UIs with AshAuthenticationPhoenix
+
+    Setting Up Magic Link Authentication
+
+Chapter 6: Authorization: What Can You Do? (123)
+    Introducing Policies
+
+    Authorizing API Access for Authentication
+
+    Assigning Roles to Users
+
+    Writing Policies for Artists
+    
+    Removing Forbidden Actions from the UI
+
+    Writing Policies for Albums
+
+Chapter 7: Testing Your Application (157)
+    What Should We Test?
+
+    Setting Up Data
+
+    Consolidating Test Setup Logic
+
+    Testing Reasources
+
+    Testing Interfaces
+
+Chapter 8: Having Fun With Nested Forms (179)
+    Setting Up a Track Resource
+    
+    Managing Relationships for Related Reasources
+
+    Reorder All of the Tracks!!!
+
+    Automatic Converstions Between Seconds and Minutes
+
+    Adding Track Data to API Responses
+
+Chapter 9: Following Your Favorite Artists (207)
+    Modelling with a Many-to-Many Relationship
+
+    Who Do You Follow?
+
+    Spicing Up the Artist Catalog
+
+Chapter 10: Delivering Real-Time Updates with PubSub (225O)
+    Notifying Users About New Albums
+
+    Running Actions in Bulk
+
+    Showing Notifications to Users
+
+    Updating Notifications in Real Time
+    
+    We Need to Talk About Atomics
+
+    Wrapping Everything Up
