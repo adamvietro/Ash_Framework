@@ -1,4 +1,6 @@
 Chapter 1: Building Our First Resource (1)
+    Ash is a set of tools you can use to describe and build the Domain Model.
+
     Getting the Ball Rolling
 
     Oh, CRUD! - Defining Basic Actions

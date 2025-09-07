@@ -1,0 +1,46 @@
+*.swp
+*.tmp
+# The directory Mix will write compiled artifacts to.
+tunez/_build/
+
+# If you run "mix test --cover", coverage assets end up here.
+tunez/cover/
+
+# The directory Mix downloads your dependencies sources to.
+tunez/deps/
+# If you run "mix deps.compile", build artifacts end up here.
+tunez/deps/
+
+# Where 3rd-party dependencies like ExDoc output generated docs.
+tunez/doc/
+
+# Ignore .fetch files in case you like to edit your project deps locally.
+tunez/.fetch
+
+# If the VM crashes, it generates a dump, let's ignore it too.
+tunez/erl_crash.dump
+
+# Also ignore archive artifacts (built via "mix archive.build").
+*.ez
+
+# Temporary files, for example, from tests.
+tunez/tmp/
+
+# Ignore package tarball (built via "mix hex.build").
+tunez-*.tar
+
+# Ignore assets that are produced by build tools.
+tunez/priv/static/assets/
+
+# Ignore digested assets cache.
+tunez/priv/static/cache_manifest.json
+
+# In case you use Node.js/npm, you want to ignore these.
+npm-debug.log
+tunez/assets/node_modules/
+
+# Ignore macOS-generated files
+.DS_Store
+
+# Editor-generated files
+.elixir_ls
