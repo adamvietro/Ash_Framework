@@ -21,9 +21,38 @@ Chapter 1: Building Our First Resource (1)
                 mix igniter.install ash_postgres
 
         Reasources and Domains
-            One of the most inportant concept is resource in ASH. They are domain model objects (nouns our app revolves around). 
+            One of the most important concept is resource in ASH. They are domain model objects (nouns our app revolves around). 
 
-            Related resources are grouped together into Domains.
+            Related resources are grouped together into Domains. What this means for our app is that we will define several domainds for distinct ideas within the app, Music, Album, Artist, Track User, Notifications
+
+            We will set attributes for each. which is data that maps to keys of the resource's struct. 
+
+        Generating the Artist Resource
+            First we can create the Artist resource. It will hold the artists name and biography. For this we will use a generator with this command. It will do the following: create a new module Tunez.Music.Artist, a new domain module named Tunez.Music (check out lib/tunez/music/artist.ex) 
+                mix ash.gen.resource Tunez.Music.Artist -- extend postgres
+
+            Now that we have the general domain we can now populate it with a table and some attributes
+                defmodule Tunez.Music.Artist do
+                    use Ash.Resource, otp_app: :tunez, domain: Tunez.Music, data_layer: AshPostgres.DataLayer
+
+                    postgres do
+                        table("artists")
+                        repo(Tunez.Repo)
+                    end
+                end
+
+            Then we can set some attributes: first we want a primary key UUID key, time stamp fields (create_timestamp, update_timestamp, name, biography) as you can see below a lot of this can be done with just simple keywords.
+                attributes do
+                    uuid_primary_key(:id)
+
+                    attribute :name, :string do
+                    allow_nil?(false)
+                    end
+
+                    attribute(:biography, :string)
+                    create_timestamp(:inserted_at)
+                    update_timestamp(:updated_at)
+                end
 
 
     Oh, CRUD! - Defining Basic Actions
