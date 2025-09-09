@@ -1,7 +1,30 @@
 Chapter 1: Building Our First Resource (1)
-    Ash is a set of tools you can use to describe and build the Domain Model.
+    Ash is a set of tools you can use to describe and build the Domain Model. For this we will set up the Tunez Application, install Ash, and build our first reasource.
 
     Getting the Ball Rolling
+        This will be a lightweight spotify app (without the music). 
+
+        Setting Up Your Development Environement
+            They created a starter github for this project so run
+                git clone https://github.com/sevenseacat/tunez
+                cd tunez
+                mix setup
+                mix phx.server
+
+            IF all that works you have everthing you need. if not make sure you have asdf and insall the files in the .tool-versions
+
+        Welcome to ASH!!
+            Now that we know its all working we can now be sure to insall an other depedency which is ingiter, this is already ready to go from the Tunez project. This will set some new deps and formatter lines as well as fixing the config to be sure to have all the right depedency.
+                mix igniter.insall ash
+
+            Next we need to set up the post_gres for ash as well. This will do the following add and fetch ash_postgres Hex package, add more autoformatting to config and formatter, update the database to use ASH, update some alias to use ASH instead of Ecto, Generate our first migration, generate the extensions for the config. 
+                mix igniter.install ash_postgres
+
+        Reasources and Domains
+            One of the most inportant concept is resource in ASH. They are domain model objects (nouns our app revolves around). 
+
+            Related resources are grouped together into Domains.
+
 
     Oh, CRUD! - Defining Basic Actions
 

@@ -1,3 +1,7 @@
+# Ignore build artifacts
+*.beam
+# Ignore editor temporary files
+*~
 *.swp
 *.tmp
 # The directory Mix will write compiled artifacts to.
