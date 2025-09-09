@@ -54,8 +54,107 @@ Chapter 1: Building Our First Resource (1)
                     update_timestamp(:updated_at)
                 end
 
+            We still need to create the database and there is a command for that (ash.codegen) let's start to look into that now.
+
+        Auto-generating Database Migrations
+            If you have run with ecto before you will know that everyting needs to stay up to date and if you update a schema or datebases independently you will not have an up to date DB. Ash will sidestep this and make sure that everything is done together. `mix ash.codegen' will do the following:
+                create shapshots of your current Reasources
+                compare them to the older snapshot (if extisting)
+                generate deltas for the changes.
+
+            Let's run that command to create the artists. This created a few files for us, so that we can keep everything up to date: a snapshot priv/resource_snapshots/repo/artists/[*].json, and the migration for the artist resource priv/repo/migrations/[*]_create_artists.ex
+                mix ash.codegen create_artists
+
+            Let's check out the migration that was just created.
+                def up do
+                    create table(:artists, primary_key: false) do
+                    add :id, :uuid, null: false, default: fragment("gen_random_uuid()"), primary_key: true
+                    add :name, :text, null: false
+                    add :biography, :text
+
+                    add :inserted_at, :utc_datetime_usec,
+                        null: false,
+                        default: fragment("(now() AT TIME ZONE 'utc')")
+
+                    add :updated_at, :utc_datetime_usec,
+                        null: false,
+                        default: fragment("(now() AT TIME ZONE 'utc')")
+                    end
+                end
+
+                def down do
+                    drop table(:artists)
+                end
+            
+            Looks just like something that you would create doing it all yourself. This all came from the schema we created and then the Ash generator. We can now migrate with the mix ash command.
+                mix ash.migrate
 
     Oh, CRUD! - Defining Basic Actions
+        Remember that CRUSD is:
+            Create
+            Read
+            Update
+            Delete
+
+        We will need to define those actions within our database. Remembering that everything that we want to do can be done within the artists.ex file simply add in an action block and go.
+
+        Defining a Create Action
+            All actions require a type (create, read, update, destroy) I will put all the changes to the module below but there will be a few thing to look for. As of right now we just the action and an atom to call it with, and then what it will accept
+
+              actions do
+                create :create do
+                accept([:name, :biography])
+            end
+        
+        Creating Records via a Changeset
+            Create a changeset and then pass it to a process to add it.
+                iex -S mix
+                Tunez.Music.Artist
+                |> Ash.Changeset.for_create(:create, %{
+                name: "Valkyrie's Fury",
+                biography: "A power metal band hailing from Tallinn, Estonia"
+                })
+                |> Ash.create()
+
+            Now we can see if it did infact work with a psql command
+                psql tunez_dev
+                tunez_dev=# select * from artists;
+                    -[ RECORD 1 ]----------------------------------------------
+                    id | [uuid]
+                    name | Valkyrie's Fury
+                    biography | A power metal band hailing from Tallinn, Estonia
+                    inserted_at | [now]
+                    updated_at | [now]
+            
+            We can now check to see if you can do some other creates with or without name etc.
+
+        Creating Records via a Code Interface
+            So we want to now use a Domain to interact with a database so that we can have lower level (reasources) work done through a domain. Let's head to the file /lib/tunez/music.ex. This is a domain.
+                resources do
+                    resource Tunez.Music.Artist do
+                        define :create_artist, action: :create
+                    end
+                end
+
+            With this in place we can no interact with the create_artist function.
+                iex(5)> h Tunez.Music.create_artist
+
+                 def create_artist(params \\ nil, opts \\ nil)                  
+
+                Calls the create action on Tunez.Music.Artist.
+
+                # Inputs
+
+                • name
+                • biography
+
+            Okay so now we can use this syntax to create an artist from the music module.
+                iex > Tunez.Music.create_artist(%{
+                name: "Valkyrie's Fury",
+                biography: "A power metal band hailing from Tallinn, Estonia"
+                })    
+
+            Let's quickly look at the seed logic in the mix.exs so that we can see what kind of work is done with the `mix seed` command.             
 
     Integrating Actions into LiveViews
 
