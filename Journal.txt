@@ -154,7 +154,108 @@ Chapter 1: Building Our First Resource (1)
                 biography: "A power metal band hailing from Tallinn, Estonia"
                 })    
 
-            Let's quickly look at the seed logic in the mix.exs so that we can see what kind of work is done with the `mix seed` command.             
+            Let's quickly look at the seed logic in the mix.exs so that we can see what kind of work is done with the `mix seed` command.
+                  defp aliases do
+                    [
+                    setup: ["deps.get", "ash.setup", "assets.setup", "assets.build", "run priv/repo/seeds.exs"],
+                    "ecto.setup": ["ecto.create", "ecto.migrate"],
+                    seed: [
+                        "run priv/repo/seeds/01-artists.exs",
+
+            With this line uncommented we can run the mix seed to create some artists.
+                mix seed
+
+        Defining a Read Action
+            now we can add in the read action to the resource Artist
+                read :read do
+                    primary?(true)
+                end
+
+            Then add it to the music Domain
+                define :read_artist, action: :read
+
+                iex> Tunez.Music.read_artists()
+
+            ``Manually Reading Records Via a Query``
+                This will now work for us. Right now as we didn't set some params for the read we will just pull everything the other way is to create a temp artist struct and then pass some queries to it. The basic idea is: create basic query > pipe through functions to add params > Pass to Ash for processing, see below.
+                    iex(2)> Tunez.Music.Artist
+                    Tunez.Music.Artist
+                    iex(3)> |> Ash.Query.for_read(:read)
+                    #Ash.Query<resource: Tunez.Music.Artist, action: :read>
+                    Then you can pipe that query into Ash’s query functions like sort and limit. The
+                    query keeps getting the extra conditions added to it, but it isn’t yet being run
+                    in the database.
+                    iex(4)> |> Ash.Query.sort(name: :asc)
+                    #Ash.Query<resource: Tunez.Music.Artist, action: :read, sort: [name: :asc]>
+                    iex(5)> |> Ash.Query.limit(1)
+                    #Ash.Query<resource: Tunez.Music.Artist, action: :read, sort: [name: :asc],
+                    limit: 1>
+                    Then, when it’s time to go, Ash can call it and return the data you requested,
+                    with all conditions applied:
+                    iex(6)> |> Ash.read()
+                    SELECT a0."id", a0."name", a0."biography", a0."inserted_at", a0."updated_at"
+                    FROM "artists" AS a0 ORDER BY a0."name" LIMIT $1 [1]
+                    {:ok, [#Tunez.Music.Artist<...>]}
+
+            `Reading a Single Record by Primary Key` 
+                Right now again if we were to try a read it will retieve everything but there is a simple way to use a resource and be able to pass a param and get a record by that param. Head back to the music domain and then add this.
+                    define :get_artist_by_id, action: :read, get_by: :id
+
+        Defining an Update Action
+            Now we can add in an update. Remember that we now just need to add in the action and then add it to a module.
+                update :update do
+                    accept [:name, :biography]
+                end
+
+                define :update_artist, action: :update
+
+            How do we use this? Well we need an artist and then we need to send it the information that will be updated.
+                iex(3)> artist = Tunez.Music.get_artist_by_id!("an-artist-id")
+                #Tunez.Music.Artist<id: "an-artist-id", ...>
+                Now we can either use the code interface we added or create a changeset and
+                apply it, as we did for create.
+                iex(4)> # Via the code interface
+                iex(5)> Tunez.Music.update_artist(artist, %{name: "Hello"})
+                UPDATE "artists" AS a0 SET "updated_at" = (CASE WHEN $1::text !=
+                a0."name"::text THEN $2::timestamp ELSE a0."updated_at"::timestamp END)
+                ::timestamp, "name" = $3::text WHERE (a0."id"::uuid = $4::uuid) RETURNING
+                a0."id", a0."name", a0."biography", a0."inserted_at", a0."updated_at"
+                ["Hello", [now], "Hello", "an-artist-id"]
+                {:ok, #Tunez.Music.Artist<id: "an-artist-id", name: "Hello", ...>}
+                iex(6)> # Or via a changeset
+                iex(7)> artist
+                |> Ash.Changeset.for_update(:update, %{name: "World"})
+                |> Ash.update()
+                «an almost-identical SQL statement»
+                {:ok, #Tunez.Music.Artist<id: "an-artist-id", name: "World", ...>}
+
+        Defining a Destroy Action
+            Now we simply need to add in a delete (destroy) and we have at least the start of CRUD
+                destroy :destroy do
+                end
+
+                define :destroy_artist, action: :destroy
+
+            How we will use it is slightly different as we would like to use a changeset
+                ex(3)> artist = Tunez.Music.get_artist_by_id!("the-artist-id")
+                #Tunez.Music.Artist<id: "an-artist-id", ...>
+                iex(4)> # Via the code interface
+                iex(5)> Tunez.Music.destroy_artist(artist)
+                DELETE FROM "artists" AS a0 WHERE (a0."id" = $1) ["the-artist-id"]
+                :ok
+                iex(6)> # Or via a changeset
+                iex(7)> artist
+                |> Ash.Changeset.for_destroy(:destroy)
+                |> Ash.destroy()
+                DELETE FROM "artists" AS a0 WHERE (a0."id" = $1) ["the-artist-id"]
+                :ok
+
+        Default Actions
+            Now that we know how to setup some of the actions we can just use a module and set some default actions as ASH is set to just use CRUD off the bat. Let's go to the artist.ex resource and replace everything with this.
+                defaults [:create, :read, :update, :destroy]
+                default_accept [:name, :biography]
+
+            What is great about this is that the normal default here add in a lot of functionality that you would want (or and not use) like pagination etc.
 
     Integrating Actions into LiveViews
 
