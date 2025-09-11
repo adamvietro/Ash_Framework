@@ -258,6 +258,22 @@ Chapter 1: Building Our First Resource (1)
             What is great about this is that the normal default here add in a lot of functionality that you would want (or and not use) like pagination etc.
 
     Integrating Actions into LiveViews
+        Now that we have the database and some dummy entries we can try to actually look at the database and teh Phoenix integration.
+            mix phx.server
+            # Then head to localhost:4000 and check it out.
+        
+        What you are seeing on the main page is the module in lib/tunez_web/live/artist/index_live.ex. They set us up with some dummy artist but we can replace the artists with a call to the database.
+            artists = Tunez.Music.read_artists!() # Notice the ! this will jsut return the artists not a condition as well
+
+        Viewing an Artist Profile
+            Clicking on an image will take you to the profile page using TunezWeb.Artists.ShowLive, again we see that there is some default data here and we can now change the default with get_artist_by_id! (again the !)
+                def handle_params(%{"id" => artist_id} =  params, _url, socket) do
+                    artist = Tunez.Music.get_artist_by_id!(artist_id)
+                    ...
+                end
+        
+        Creating Artists with AshPhoenix.Form
+            
 
 Chapter 2: Extending Reasources with Business Logic (33)
     Reasources and Relationships
