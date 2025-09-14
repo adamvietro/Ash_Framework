@@ -501,7 +501,7 @@ Chapter 2: Extending Reasources with Business Logic (33)
             Now we can add in the new resource to the Module Music. Same as before we can add in the album now.
                 resource Tunez.Music.Album do
                     define :create_album, action: :create
-                    define :get_album_by_id, action: :read
+                    define :get_album_by_id, action: :read, get_by: :id
                     define :update_album, action: :update
                     define :destroy_album, action: :destroy
                 end
@@ -562,10 +562,56 @@ Chapter 2: Extending Reasources with Business Logic (33)
             "Using Artist Data on the Album Form"
                 Okay so now we need to be sure that we have the right artist for the album that we are creating. We know the ID of the artist so we can now access that and then make sure the we add that to the new form.
                     artist = Tunez.Music.get_artist_by_id!(album.artists_id)
+                Then we need to add in the value of the artist to the form on the page
+                    <.input name="artist_id" label="Artist" value={@artist.name} disabled />
+
+                    # Then we need to update the new mount to be sure that we have the artist in the socket and then change the first mount to be sure that we have it in there as well
+                    |> assign(:artist, artist)
+                    mount(%{"artist_id" => artist_id})
+
+                Now let's figure out how to add in the artist to the save but not the update. We can do this but setting the way in which you even get the form done. You can set the forms in the domain. We will use the form to do this.
+                    forms do
+                        form :create_album, args: [:artist_id]
+                    end
 
     Loading Related Reasource Data
+        Now we can make sure that we have the right list of albums within the ShowLive for the artist. We should head to lib/tunez_web/live/artists/show_live.ex then we can agument the artist to also get the album information as well.
+            artist = Tunez.Music.get_artist_by_id!(artist_id, load: [:albums])
+            # Now change the assign to remove the album line and the general album as well.
+            # change the render as well as we no longer have the value for the :album
+        
+        We have the first index set now we should be able to set the form live for the album as well. lib/tunez_web/live/albums/form_live.ex and now you can set the artist with the load as they are related.
+            album = Tunez.Music.get_album_by_id!(album_id, load: [:artist])
+            ...
+            |> assign(:artist, album.artist)
+        
+        To go one step further you can even make sure that things are ordered withing the artist album. lib/tunez/music/artist.ex
 
     Structured Data with Validations and Identities
+        Consistant Data with Validations
+            We are going to make sure that when we have a year_released its a valid year and even a valid image URL if we have one, we can even be sure that we are making sure we are not adding the same album twice. Let's head over to lib/music/album.ex
+                validations do
+                    validate(
+                    numericality(:year_released,
+                        greater_than: 1950,
+                        less_than_or_equal_to: &__MODULE__.next_year/0
+                    ),
+                    where: [present(:year_released)],
+                    message: "must be between 1950 and next year"
+                    )
+
+                    validate(
+                    match(
+                        :cover_image_url,
+                        ~r"^(https://|/images/).+(\.png|\.jpg)$"
+                    ),
+                    where: [changing(:cover_image_url)],
+                    message: "must start with https:// or /images/"
+                    )
+                end
+
+        Unique Data with Identities
+
 
     Deleting All of the Things
 
