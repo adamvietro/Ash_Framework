@@ -623,10 +623,132 @@ Chapter 2: Extending Reasources with Business Logic (33)
                 mix ash.migrate
             To see what changed head to priv/repo/migrations/[timestamp]_add_unique_album_names_per_artist.exs
 
-
     Deleting All of the Things
+        Deleting Album Data
+            lib/tunez_web/live/artists/show_live.ex
+                def handle_event("destroy-album", %{"id" => album_id}, socket) do
+                    case Tunez.Music.destroy_album(album_id) do
+                    :ok ->
+                        socket =
+                        socket
+                        |> update(:artist, fn artist ->
+                            Map.update!(artist, :albums, fn albums ->
+                            Enum.reject(albums, &(&1.id == album_id))
+                            end)
+                        end)
+                        |> put_flash(:info, "Album deleted successfully")
 
+                        {:noreply, socket}
+
+                    {:error, error} ->
+                        Logger.info("Could not delete album '#{album_id}': #{inspect(error)}")
+
+                        socket =
+                        socket
+                        |> put_flash(:error, "Could not delete album")
+
+                        {:noreply, socket}
+                    end
+                end
+
+        Cascading Deletes with AshPostgres
+            We can now utilize the belongs_to to make sure that everything is deleted when we delete an artist. We want to delete the related data on delete of the higher level data. Once this is done we will need to codegen and then migrate the database as well
+            lib/tunez/music/album.ex
+                postgres do
+                    table("albums")
+                    repo(Tunez.Repo)
+
+                    references do
+                    reference(:artist, index?: true, on_delete: :delete)
+                    end
+                end
+
+                # Then
+                mix ash.codegen configure_reference_for_album_artist_id
+                mix ash.migrate
+            
     Changing Data with Actions
+        So much of what we have done so far is setting a lot of data and built-in functions like inserted_at etc, this was all taken care of by ASH. But there is a way to do this manually. Let's go over a few of those now.
+        
+        Defining an Inline Change
+            We want to keep track of any change to an artists name but tracking all previous artists names. lib/tunez/music/artist.ex, as with all the others this is a db change so we need a codegen and then a migration.
+                attributes do
+                    # ...
+                    attribute :previous_names, {:array, :string} do
+                        default []
+                    end
+                    # ...
+                end
+            
+                # Then
+                mix ash.codegen add_previous_names_to_artists
+                mix ash.migrate
+
+            Okay so we have the column in the db for the previous_names, but that isn't enough as we now need to update the actions to not just use the defualt and then we need to be sure to add the names to the list. Same file also make sure to remove the update from the defaults first the general syntax will look like this.
+                update :update do
+                    accept([:name, :biography])
+                    change(fn changeset, _context -> changeset end)
+                end
+
+                # This is the actual code we want.
+                actions do
+                    defaults([:create, :read, :destroy])
+                    default_accept([:name, :biography])
+
+                    update :update do
+                    require_atomic?(false)
+                    accept([:name, :biography])
+
+                    change(
+                        fn changeset, _context ->
+                        new_name = Ash.Changeset.get_attribute(changeset, :name)
+                        previous_name = Ash.Changeset.get_data(changeset, :name)
+                        previous_names = Ash.Changeset.get_data(changeset, :previous_names)
+
+                        names =
+                            [previous_name | previous_names]
+                            |> Enum.uniq()
+                            |> Enum.reject(fn name -> name == new_name end)
+
+                        Ash.Changeset.change_attribute(changeset, :previous_names, names)
+                        end,
+                        where: [changing(:name)]
+                    )
+                    end
+                end
+            
+        Defining a Change Module
+            Guess what you can do all that with a much easier and faster built-in way!!! lib/tunez/music/changes/update_previous_names.ex, there is not command for this so just create the folder and file and then update the resource.
+                defmodule Tunez.Music.Changes.UpdatePreviousNames do
+                    use Ash.Resource.Change
+                    @impl true
+                    def change(changeset, _opts, _context) do
+                        new_name = Ash.Changeset.get_attribute(changeset, :name)
+                        previous_name = Ash.Changeset.get_data(changeset, :name)
+                        previous_names = Ash.Changeset.get_data(changeset, :previous_names)
+
+                        names =
+                        [previous_name | previous_names]
+                        |> Enum.uniq()
+                        |> Enum.reject(fn name -> name == new_name end)
+
+                        Ash.Changeset.change_attribute(changeset, :previous_names, names)
+                    end
+                end
+
+                # Then change the action in the resource lib/tunez/music/artist.ex
+                update :update do
+                    require_atomic?(false)
+                    accept([:name, :biography])
+
+                    change(Tunez.Music.Changes.UpdatePreviousNames,
+                        where: [changing(:name)]
+                    )
+                end
+
+        Changes Run More Often than You Might Think!
+            
+
 
 Chapter 3: Creating a Better Search UI (59)
     Custom Actions with Arguments

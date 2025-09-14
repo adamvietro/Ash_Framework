@@ -13,19 +13,32 @@ defmodule Tunez.Music.Artist do
       allow_nil?(false)
     end
 
+    attribute :previous_names, {:array, :string} do
+      default([])
+    end
+
     attribute(:biography, :string)
     create_timestamp(:inserted_at)
     update_timestamp(:updated_at)
   end
 
   actions do
-    defaults([:create, :read, :update, :destroy])
+    defaults([:create, :read, :destroy])
     default_accept([:name, :biography])
+
+    update :update do
+      require_atomic?(false)
+      accept([:name, :biography])
+
+      change(Tunez.Music.Changes.UpdatePreviousNames,
+        where: [changing(:name)]
+      )
+    end
   end
 
   relationships do
     has_many :albums, Tunez.Music.Album do
-      sort year_released: :desc
+      sort(year_released: :desc)
     end
   end
 end
