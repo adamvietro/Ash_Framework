@@ -3,10 +3,10 @@ defmodule Tunez.Music.Changes.UpdatePreviousNames do
 
   @impl true
   def change(changeset, _opts, _context) do
-    Ash.Changeset.before_action(changeset, fn changeset, _context ->
+    Ash.Changeset.before_action(changeset, fn changeset ->
       new_name = Ash.Changeset.get_attribute(changeset, :name)
-      previous_name = Ash.Changeset.get_data(changeset, :name)
-      previous_names = Ash.Changeset.get_data(changeset, :previous_names) || []
+      previous_name = Map.get(changeset.data, :name)
+      previous_names = Map.get(changeset.data, :previous_names) || []
 
       names =
         [previous_name | previous_names]
