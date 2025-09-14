@@ -747,7 +747,41 @@ Chapter 2: Extending Reasources with Business Logic (33)
                 end
 
         Changes Run More Often than You Might Think!
-            
+            Keep in mind that any time you: 
+                Building the inital form
+                Authorization checks
+                Every validation check
+                When submitting the form
+            You are running a change. As such you should wrap them in hooks such as Ash.Changeset.before_action or Ash.Changeset.after_action. So the UpdatePreviousNames would look like this.
+                def change(changeset, _opts, _context) do
+                    Ash.Changeset.before_action(changeset, fn ->
+                    # The code previously in the body of the function
+                    # It can still use any `opts` or `context` passed in to the top-level
+                    # change function, as well
+                    new_name = Ash.Changeset.get_attribute(changeset, :name)
+                    previous_name = Ash.Changeset.get_data(changeset, :name)
+                    previous_names = Ash.Changeset.get_data(changeset, :previous_names)
+
+                    names =
+                        [previous_name | previous_names]
+                        |> Enum.uniq()
+                        |> Enum.reject(fn name -> name == new_name end)
+
+                    Ash.Changeset.change_attribute(changeset, :previous_names, names)
+                    end)
+                end
+            This is going to run right before the action is completed that calls it, in our case the change name.
+        
+        Rendering the Previous Names in the UI
+            This will be quick so just add this to the code and you will see the older names.
+            lib/tunez_web/live/artists/show_live.ex
+            <.header>
+                <.h1>...</.h1>
+                <:subtitle :if={@artist.previous_names != []}>➤
+                    formerly known as: {Enum.join(@artist.previous_names, ", ")}➤
+                </:subtitle>
+                ...
+            </.header>
 
 
 Chapter 3: Creating a Better Search UI (59)
