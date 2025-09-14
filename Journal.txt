@@ -611,6 +611,17 @@ Chapter 2: Extending Reasources with Business Logic (33)
                 end
 
         Unique Data with Identities
+            Now lets make sure that we have the right validations for the picture URL. This requires a different set of rules to run. This will create an index in the 2 db so that it can check for those values within the DB so we will need to run a command ofter we do that.
+                identities do
+                    identity(:unique_album_names_per_artist, [:artist_id, :name],
+                    message: "already exists for this artist"
+                    )
+                end
+
+                # Then
+                mix ash.codegen add_unique_album_names_per_artist
+                mix ash.migrate
+            To see what changed head to priv/repo/migrations/[timestamp]_add_unique_album_names_per_artist.exs
 
 
     Deleting All of the Things
