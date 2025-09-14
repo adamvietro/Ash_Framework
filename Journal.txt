@@ -431,6 +431,137 @@ Chapter 1: Building Our First Resource (1)
  
 Chapter 2: Extending Reasources with Business Logic (33)
     Reasources and Relationships
+        We have created a single reasource now lets create an album reasource. 
+            mix ash.gen.resource Tunez.Music.Album --extend postgres
+
+        We now have some new files, we want to add these things to the DB:
+            Artist, Album name, Year released, Image
+
+        Let's head over to lib/tunez/music/album.ex
+            attributes do
+                uuid_primary_key :id
+                attribute :name, :string do
+                    allow_nil? false
+                end
+                attribute :year_released, :integer do
+                    allow_nil? false
+                end
+                attribute :cover_image_url, :string
+                create_timestamp :inserted_at
+                update_timestamp :updated_at
+            end
+
+        As you might notice you don't see a artist that will be a relationship.
+
+        "Defining Relationships"
+            There are different types of relationship 
+            has_many: One has Many (Posts)
+            belongs_to: One belongs to One (Post)
+            has_one: One has One (User Profile)
+            many_to_many: Many to Many (tags)
+
+            Not we can head to lib/tunez/music/artist.ex and add in the relationship
+                relationships do
+                    belongs_to :artist, Tunez.Music.Artist
+                end
+
+                relationships do
+                    has_many :albums, Tunez.Music.Album do
+                end
+            
+            Now that we have that setup we can generate and set the migration
+                mix ash.codegen create_album
+
+            We now have the new DB and the relationship between the artist and albums. We still need to index from the foriegn key. to do that we need to head back to album.ex and set the index?: to true
+                postgres do
+                # ...
+                references do
+                    reference :artist, index?: true➤
+                end
+
+            This changed the DB so we can now run the code.gen again to create the snapshot and the migrations.
+                mix ash.codegen create_album
+                mix ash.migrate
+            
+
+        "Album Actions"
+            As with before we need to set all the actions for the albums. What is great is that we can make sure that we utilize ASH to make sure that you only pull the albums that are related to the artist.
+                actions do
+                    defaults([:read, :destroy])
+
+                    create :create do
+                    accept([:name, :year_released, :cover_image_url, :artist_id])
+                    end
+
+                    update :update do
+                    accept([:name, :year_released, :cover_image_url])
+                    end
+                end
+
+            Now we can add in the new resource to the Module Music. Same as before we can add in the album now.
+                resource Tunez.Music.Album do
+                    define :create_album, action: :create
+                    define :get_album_by_id, action: :read
+                    define :update_album, action: :update
+                    define :destroy_album, action: :destroy
+                end
+
+            They gave us some sample items and albums we want to now run the mix to add them in and then mix seed to get the rest of the albums after uncommenting the right line in the mix.exs.
+                mix run priv/repo/seeds/02-albums.exs
+                mix seed
+                # There might be some issues here with older data being left behind ignore it for now.
+
+        "Creating and Updating Albums"
+            Now let's make sure that we have the ability to add and update albums within the site. 
+            lib/tunez_web/albums/form_live.ex
+                form = Tunez.Music.form_to_create_album()
+
+                # Then we need to add in the validate
+                def handle_event("validate", %{"form" => form_data}, socket) do
+                    socket =
+                    update(socket, :form, fn form ->
+                        AshPhoenix.Form.validate(form, form_data)
+                    end)
+                    {:noreply, socket}
+                end
+
+                # Then a save event
+                def handle_event("save", %{"form" => form_data}, socket) do
+                    case AshPhoenix.Form.submit(socket.assigns.form, params: form_data) do
+                    {:ok, _album} ->
+                        socket =
+                        socket
+                        |> put_flash(:info, "Album created successfully")
+                        |> push_navigate(to: ~p"/")
+
+                        {:noreply, socket}
+
+                    {:error, form} ->
+                        socket =
+                        socket
+                        |> put_flash(:error, "Could not create album")
+                        |> assign(:form, form)
+
+                        {:noreply, socket}
+                    end
+                end
+
+                # Last a new mount for when we are updating an event
+                def mount(%{"id" => album_id}, _session, socket) do
+                    album = Tunez.Music.get_album_by_id!(album_id)
+                    form = Tunez.Music.form_to_update_album(album)
+
+                    socket =
+                    socket
+                    |> assign(:form, to_form(form))
+                    |> assign(:page_title, "Update Album")
+
+                    {:ok, socket}
+                end
+
+            "Using Artist Data on the Album Form"
+                Okay so now we need to be sure that we have the right artist for the album that we are creating. We know the ID of the artist so we can now access that and then make sure the we add that to the new form.
+                    artist = Tunez.Music.get_artist_by_id!(album.artists_id)
 
     Loading Related Reasource Data
 
