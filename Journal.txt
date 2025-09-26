@@ -975,7 +975,9 @@ Chapter 3: Creating a Better Search UI (59)
                     id: "f6c77d42-2c90-4654-853f-37c071d9ef87",
                     name: "The Lost Keys",
                     previous_names: [],
-                    biography: "The Lost Keys are a blues rock band hailing from New Orleans, Louisiana, formed in 2014. The band comprises a group of musicians who found each other through...
+                    biography: "The Lost Keys are a blues rock band hailing from New Orleans, Louisiana, formed in 2014. The band comprises a group of musicians who found each other through...}
+                ]
+                }
 
             Now we can leverage this into a single string of values that can be added into the params. lib/tunez_web/live/artists/index_live.ex
                 def handle_params(params, _url, socket) do
