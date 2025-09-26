@@ -903,12 +903,195 @@ Chapter 3: Creating a Better Search UI (59)
                                     # ...
 
     Dynamically Sorting Artists
-        
+        Now that we have the search set we can now move onto the sort so a user can get the right artist faster.
 
+        Letting Users Set a Sort Method
+            Start with the UI then we can implement the needed code. lib/tunez_web/live/artists/index_live.ex
+                <.header responsive={false}>
+                    <.h1>Artists</.h1>
+                    <:action><.sort_changer selected={@sort_by} /></:action>
+                    ...
+
+                # Now lets set the new param in the handle_params
+                def handle_params(params, _url, socket) do
+                    sort_by = nil
+                    # ...
+
+                    socket =
+                        socket
+                        |> assign(:sort_by, sort_by)
+                        # ...
+
+                # The sort changer is below and it will call the handle_event for "change-sort". Now let's add in the validation
+                def handle_params(params, _url, socket) do
+                    sort_by = Map.get(params, "sort_by") |> validate_sort_by()
+                    # ...
+
+        The Base Query for a Read Action
+            We set up the UI now lets implement it. Here is the basic way in which we would run a query. Notice what we are asking in this read. We are setting the way in which we are sorting we need to implement that ourselves.
+                iex(2)> Tunez.Music.Artist
+                Tunez.Music.Artist
+                iex(3)> |> Ash.Query.for_read(:read)
+                Ash.Query<resource: Tunez.Music.Artist>
+                iex(4)> |> Ash.Query.sort(name: :asc)
+                #Ash.Query<resource: Tunez.Music.Artist, sort: [name: :asc]>
+                iex(5)> |> Ash.Query.limit(1)
+                #Ash.Query<resource: Tunez.Music.Artist, sort: [name: :asc], limit: 1>
+                iex(6)> |> Ash.read()
+                SELECT a0."id", a0."name", a0."biography", a0."inserted_at", a0."updated_at"
+                FROM "artists" AS a0 ORDER BY a0."name" LIMIT $1 [1]
+                {:ok, [#Tunez.Music.Artist<...>]}
+
+        Using sort_input for Succinct yet Expressive Sorting
+            Normally you can use sort and then set things like name: :asc, inserted_at: :desc you can even test this out.
+                iex(6)> Tunez.Music.search_artists("the", [query: [sort: [name: :asc]]])
+                    {:ok,
+                    [
+                        #Tunez.Music.Artist<name: "Nights in the Nullarbor", ...>,
+                        #Tunez.Music.Artist<name: "The Lost Keys", ...>
+                    ]}
+            
+            But we can use sort_input a bit differently. So we can just set a list of key words and the it will pull from those. But in order to utilize this we need to make some changes to the resource, in order to use it, sort_input will need PUBLIC atrributes. Let's head over to lib/tunez/music/artist.ex
+                atrributes do
+                    # ...
+                    attribute :name, :string do
+                        allow_nil?(false)
+                        public?(true)
+                    end
+
+                    # ...
+                    create_timestamp(:inserted_at, public?: true)
+                    update_timestamp(:updated_at, public?: true)
+                end
+
+                Head into an iex and test this out
+                iex(6) > Tunez.Music.search_artists("the", [query: [sort_input: "-name"]])
+                [debug] QUERY OK source="artists" db=0.9ms queue=0.5ms idle=1270.9ms
+                SELECT a0."id", a0."name", a0."biography", a0."inserted_at", a0."previous_names", a0."updated_at" FROM "artists" AS a0 WHERE (a0."name"::text ILIKE $1) ORDER BY a0."name" DESC ["%the%"]
+                ↳ anonymous fn/3 in AshPostgres.DataLayer.run_query/2, at: lib/data_layer.ex:827
+                {:ok,
+                [
+                %Tunez.Music.Artist{
+                    id: "f6c77d42-2c90-4654-853f-37c071d9ef87",
+                    name: "The Lost Keys",
+                    previous_names: [],
+                    biography: "The Lost Keys are a blues rock band hailing from New Orleans, Louisiana, formed in 2014. The band comprises a group of musicians who found each other through...
+
+            Now we can leverage this into a single string of values that can be added into the params. lib/tunez_web/live/artists/index_live.ex
+                def handle_params(params, _url, socket) do
+                    # ...
+                    artists = Tunez.Music.search_artists!(query_text, query: [sort_input: sort_by])
+
+                # Now just a quick tweek to the sort_options
+                defp sort_options do
+                    [
+                        {"recently updated", "-updated_at"},
+                        {"recently added", "-inserted_at"},
+                        {"name", "name"}
+                    ]
+                end
+            
+        We now can change the way in-which we sort the data and it will update on the URL as well so you can copy and paste a URL to your friends.
+            
     Pagination of Search Results
+        Now lets add in some paginagtion so that you can also be sure to have everything in a more consice manner.
+
+        Adding Pagination Support to the search Action
+            First lets head to lib/tunez/music/artist.ex and add in an other part for the search.
+                read :search do
+                # ...
+                    pagination offset?: true, default_limit: 12
+                end
+
+            It can support both types if pagination amount of records or after record x. You can test it out as well. 
+                iex(1)> Tunez.Music.search_artists!("cove")
+                    #Ash.Page.Offset<
+                    results: [#Tunez.Music.Artist<name: "Crystal Cove", ...>],
+                    limit: 12,
+                    offset: 0,
+                    count: nil,
+                    more?: false,
+                    ...
+                >
+            
+        Showing Paginated Data in the Catalog
+            So now we need to understand what page we are on and the search artists will not have that information. So we can leverage that with the handle_params lib/tunez/live/artists/index_live.ex since it now will return a struct for the page you are recieving not and "artist" 
+                def handle_params(params, _url, socket) do
+                    # ...
+                    page = Tunez.Music.search_artists!(query_text, query: [sort_input: sort_by])
+                    socket =
+                        socket
+                        |> assign(:query_text, query_text)
+                        |> assign(:page, page)
+                        # ...
+
+                # Now lets set the render and html code.
+                <div :if={@page.results == []} class="p-8 text-center">
+                    <.icon name="hero-face-frown" class="w-32 h-32 bg-gray-300" />
+                    <br /> No artist data to display!
+                </div>
+
+                <ul class="gap-6 lg:gap-12 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
+                    <li :for={artist <- @page.results}>
+                    <.artist_card artist={artist} />
+                    </li>
+                </ul>
+
+                # Now we only show 1 page of results and we will need a way to get to the next page of artists.
+                <Layouts.app {assigns}>
+                    # ...
+                    <.pagination_links page={@page} query_text={@query_text}
+                        sort_by={@sort_by} />
+                </Layouts.app>
+
+                # Now we need to make them work so lets use an other built-in funcionality of ASH. AshPhoenix.LiveView, this will help us determine if or when we can get to an other page. We will do this in the pagination_links function.
+                <div
+                    :if={AshPhoenix.LiveView.prev_page?(@page) ||
+                        AshPhoenix.LiveView.next_page?(@page)}
+                    class="flex justify-center pt-8 space-x-4"
+                    >
+                    <.button_link data-role="previous-page" kind="primary" inverse
+                        patch={~p"/?#{query_string(@page, @query_text, @sort_by, "prev")}"}
+                        disabled={!AshPhoenix.LiveView.prev_page?(@page)}
+                    >
+                        « Previous
+                    </.button_link>
+                    <.button_link data-role="next-page" kind="primary" inverse
+                        patch={~p"/?#{query_string(@page, @query_text, @sort_by, "next")}"}
+                        disabled={!AshPhoenix.LiveView.next_page?(@page)}
+                    >
+                        Next »
+                    </.button_link>
+                </div>
+
+                # Now we can set the query_string helper and we are more than on our way
+                def query_string(page, query_text, sort_by, which) do
+                    case AshPhoenix.LiveView.page_link_params(page, which) do
+                    :invalid -> []
+                    list -> list
+                    end
+                    |> Keyword.put(:q, query_text)
+                    |> Keyword.put(:sort_by, sort_by)
+                    |> remove_empty()
+                end
+
+                # You can now do some tests but we still need to make sure that we are only loading the right artists for each page, back to handle_params
+                #... 
+                page_params = AshPhoenix.LiveView.page_from_params(params, 12)
+                page = Tunez.Music.search_artists!(query_text, query: [sort_input: sort_by], page: page_params)
+    
+            This utilized the right information and made sure that we are getting only the right artists for the right page.
 
     No DB field? No Problems, with Calculations
+        Calculations are a great way to get information that is calculated on demand but they must be loaded with the data.
 
+        Calculating Data with Style
+            We can change the album resource to deal with Calculations, lib/tunez/music/album.ex. As you will see in this you are going to build the data for how long ago it was created.
+            calculations do
+                calculate :years_ago, :integer, expr(2025 - year_released)
+            end
+
+            If we wanted to use some more dynamic values we could define a separate calculate, we will use that later to define the seconds on a track. Here is a little test.
     Relationship Calculations as Aggregates
 
 Chapter 4: Generating APIs Without Writing Code (85)

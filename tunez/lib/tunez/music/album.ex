@@ -69,5 +69,9 @@ defmodule Tunez.Music.Album do
     )
   end
 
+  calculations do
+    calculate :years_ago, :integer, expr(2025 - year_released)
+  end
+
   def next_year, do: Date.utc_today().year + 1
 end
