@@ -4,6 +4,10 @@ defmodule Tunez.Music.Artist do
   postgres do
     table("artists")
     repo(Tunez.Repo)
+
+    custom_indexes do
+      index("name gin_trgm_ops", name: "artists_name_trgm_index", using: "GIN")
+    end
   end
 
   attributes do
@@ -40,6 +44,8 @@ defmodule Tunez.Music.Artist do
         constraints(allow_empty?: true)
         default("")
       end
+
+      filter(expr(contains(name, ^arg(:query))))
     end
   end
 

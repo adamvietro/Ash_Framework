@@ -323,7 +323,7 @@ Chapter 1: Building Our First Resource (1)
                     relationships: %{},
                     errors: [],
                     data: %Tunez.Music.Artist{...},
-                    valid?: true➤
+                    valid?: true
                     >,
                     ...
 
@@ -342,7 +342,7 @@ Chapter 1: Building Our First Resource (1)
             "Using the AshPhoenix Domain Extension"
                 The functionality that we are using atm is to call the :create atom and that feels a bit problematic for what we have already done. With that being said we can now add the AshPhoenix extension to the Music Domain to leverage the new form.
                     defmodule Tunez.Music do
-                        use Ash.Domain, otp_app: :tunez, extensions: [AshPhoenix]➤
+                        use Ash.Domain, otp_app: :tunez, extensions: [AshPhoenix]
                         # ...    
                 
                 Lets try out the new way of doing things. Now we can simply append the form_to to any function and it will create a form to do that thing. Keep in mind that you will need to have the extension within the module.
@@ -476,7 +476,7 @@ Chapter 2: Extending Reasources with Business Logic (33)
                 postgres do
                 # ...
                 references do
-                    reference :artist, index?: true➤
+                    reference :artist, index?: true
                 end
 
             This changed the DB so we can now run the code.gen again to create the snapshot and the migrations.
@@ -780,8 +780,8 @@ Chapter 2: Extending Reasources with Business Logic (33)
             lib/tunez_web/live/artists/show_live.ex
             <.header>
                 <.h1>...</.h1>
-                <:subtitle :if={@artist.previous_names != []}>➤
-                    formerly known as: {Enum.join(@artist.previous_names, ", ")}➤
+                <:subtitle :if={@artist.previous_names != []}>
+                    formerly known as: {Enum.join(@artist.previous_names, ", ")}
                 </:subtitle>
                 ...
             </.header>
@@ -806,9 +806,104 @@ Chapter 3: Creating a Better Search UI (59)
 
             Filters with Expressions
                 Lets go over that last line of code and see it in action. When we run the iex session be sure to add in "require Ash.Query"
+                    iex -S mix
+                    iex(1)> require Ash.Query
+                    Ash.Query
+                    iex(2)> Ash.Query.filter(Tunez.Music.Album, year_released == 2024)
+                    #Ash.Query<resource: Tunez.Music.Album,
+                    filter: #Ash.Filter<year_released == 2024>>
+                    iex(3)> |> Ash.read()
+                    SELECT a0."id", a0."name", a0."inserted_at", a0."updated_at",
+                    a0."year_released", a0."artist_id", a0."cover_image_url" FROM "albums" AS
+                    a0 WHERE (a0."year_released"::bigint = $1::bigint) [2024]
+                    {:ok, [%Tunez.Music.Album{year_released: 2024, ...}, ...]}
+
+                Now the filter is not limited to just == you can use an where you just need to wrap it in a call to expr. 
+                    ex(4)> Tunez.Music.Artist
+                    Tunez.Music.Artist
+                    iex(5)> |> Ash.Query.for_read(:search, %{query: "co"})
+                    #Ash.Query<
+                    resource: Tunez.Music.Artist,
+                    arguments: %{query: #Ash.CiString<"co">},
+                    filter: #Ash.Filter<contains(name, #Ash.CiString<"co">)>
+                    >
+                    iex(6)> |> Ash.read()
+                    SELECT a0."id", a0."name", a0."biography", a0."previous_names",
+                    a0."inserted_at", a0."updated_at" FROM "artists" AS a0 WHERE
+                    (a0."name"::text ILIKE $1) ["%co%"]
+                    {:ok, [#Tunez.Music.Artist<name: "Crystal Cove", ...>, ...]}
+
+                This did what we want by allowing case-insentive substring matches.
+
+            Speeding Things Up with Custom Database Indexes
+                This is a very non performant way of doing thing so we can add in a GIN index to help on the name column. First we need to inable it and then start to use it. Let's get it installed first.
+                    lib/tunes/repo.ex
+                    @impl true
+                    def installed_extensions do
+                        # Add extensions here, and the migration generator will install them.
+                        ["ash-functions", "pg-trgm"]
+                    end
+                
+                Then head to lib/tunez/music/artist.ex
+                    postgres do
+                        table("artists")
+                        repo(Tunez.Repo)
+
+                        custom_indexes do
+                        index("name gin_trgm_ops", name: "artists_name_trgm_index", using: "GIN")
+                        end
+                    end
+                
+                Normally AshPostgres will generate the names of indexes by itself from the fields but since we are creating a custom index. Now run the new the new migrations.
+                    mix ash.codegen add_gin_index_for_artist_name_search
+                    mix ash.migrate
+
+            Integrating Search into the UI
+                Now lets integrate it into out first catalog.
+                "A Code Interface with Arguments"
+                    lib/tunez/music.ex
+                    resource Tunez.Music.Artist do
+                        # ...
+                        define :search_artists, action: :search, args: [:query]
+                    end
+
+                    We set a new resouce that we can use in music domain. We can now try it out in an iex session.
+                        iex(1)> h Tunez.Music.search_artists
+                            def search_artists(query, params \\ nil, opts \\ nil)
+                        Calls the search action on Tunez.Music.Artist.
+
+                "Searching from the Catalog"
+                    We want to be able to copy and replicate the results that we get from the site so we need to be able to get to them with URLs. Lets head over to lib/tunez_web/artists/index_live.ex: This is what it looks like without a param in the URL
+                        def handle_params(_params, _url, socket) do
+                            artists = Tunez.Music.read_artists!()
+                            socket =
+                                socket
+                                |> assign(:artists, artists)
+                                # ...
+
+                        # Lets pattern match the param and set some values in the query.
+                        def handle_params(params, _url, socket) do
+                            query_text = Map.get(params, "q", "")
+                            artists = Tunez.Music.search_artists!(query_text)
+                            socket =
+                                socket
+                                |> assign(:query_text, query_text)
+                                |> assign(:artists, artists)
+                                # ...
                     
+                    Now we can add in box to the header to be able to search with a bar.
+                        <.header responsive={false}>
+                            <.h1>Artists</.h1>
+                            <:action>
+                                <.search_box query={@query_text} method="get"
+                                    data-role="artist-search" phx-submit="search" />
+                            </:action>
+                            <:action>
+                                <.button_link
+                                    # ...
 
     Dynamically Sorting Artists
+        
 
     Pagination of Search Results
 
