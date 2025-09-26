@@ -789,6 +789,24 @@ Chapter 2: Extending Reasources with Business Logic (33)
 
 Chapter 3: Creating a Better Search UI (59)
     Custom Actions with Arguments
+        We want to implement a way to search for an artist and even a piece of information with a string. Something like.
+            iex> Tunez.Music.search_artists("fur")
+            {:ok, [%Tunez.Music.Artist{name: "Valkyrie's Fury"}, ...]}
+
+            Designing a Search Action
+                Lets head over to the lib/tunez/music/artist.ex and add in a read :search action. We can make it take some parameters and set some constraints and even set a default.
+                    read :search do
+                        argument(:query, :ci_string) do
+                            constraints(allow_empty?: true)
+                            default("")
+                        end
+
+                        filter(expr(contains(name, ^arg(:query))))
+                    end
+
+            Filters with Expressions
+                Lets go over that last line of code and see it in action. When we run the iex session be sure to add in "require Ash.Query"
+                    
 
     Dynamically Sorting Artists
 

@@ -34,6 +34,13 @@ defmodule Tunez.Music.Artist do
         where: [changing(:name)]
       )
     end
+
+    read :search do
+      argument(:query, :ci_string) do
+        constraints(allow_empty?: true)
+        default("")
+      end
+    end
   end
 
   relationships do
