@@ -513,7 +513,7 @@ Chapter 2: Extending Reasources with Business Logic (33)
 
         "Creating and Updating Albums"
             Now let's make sure that we have the ability to add and update albums within the site. 
-            lib/tunez_web/albums/form_live.ex
+            lib/tunez_web/live/albums/form_live.ex
                 form = Tunez.Music.form_to_create_album()
 
                 # Then we need to add in the validate
@@ -873,7 +873,7 @@ Chapter 3: Creating a Better Search UI (59)
                         Calls the search action on Tunez.Music.Artist.
 
                 "Searching from the Catalog"
-                    We want to be able to copy and replicate the results that we get from the site so we need to be able to get to them with URLs. Lets head over to lib/tunez_web/artists/index_live.ex: This is what it looks like without a param in the URL
+                    We want to be able to copy and replicate the results that we get from the site so we need to be able to get to them with URLs. Lets head over to lib/tunez_web/live/artists/index_live.ex: This is what it looks like without a param in the URL
                         def handle_params(_params, _url, socket) do
                             artists = Tunez.Music.read_artists!()
                             socket =
@@ -1087,12 +1087,154 @@ Chapter 3: Creating a Better Search UI (59)
 
         Calculating Data with Style
             We can change the album resource to deal with Calculations, lib/tunez/music/album.ex. As you will see in this you are going to build the data for how long ago it was created.
-            calculations do
-                calculate :years_ago, :integer, expr(2025 - year_released)
-            end
+                defmodule Tunez.Music.Album do
+                    # ...
+                
+                    calculations do
+                        calculate :years_ago, :integer, expr(2025 - year_released)
+                    end
 
             If we wanted to use some more dynamic values we could define a separate calculate, we will use that later to define the seconds on a track. Here is a little test.
+                iex(1) > Tunez.Music.get_artist_by_id(«uuid», load: [albums: [:years_ago]])
+                {:ok, #Tunez.Music.Artist<
+                    albums: [
+                        #Tunez.Music.Album<year_released: 2022, years_ago: 3, ...>,
+                        #Tunez.Music.Album<year_released: 2012, years_ago: 13, ...>
+                    ],
+                    ...
+                >}
+
+            Now lets add some or funcionality
+                calculations do
+                    calculate :years_ago, :integer, expr(2025 - year_released)
+                    calculate :string_years_ago,
+                    :string,
+                    expr("wow, this was released " <> years_ago <> " years ago!")
+                end
+        
+        Calculations with Related Records
+            Now we want to build some calculations for each artist that will contain: This will be done in the artists resource, lib/music/artist.ex
+                The Number of albums
+                The year of the latest album
+                The most recent album cover
+
+            "Counting Albums for an Artist"
+                defmodule Tunez.Music.Artist do
+                    # ...
+                    calculations do
+                        calculate :album_count, :integer, expr(count(albums))
+                    end
+                end
+
+                Here is a test.
+                iex(1)> Tunez.Music.search_artists("a", load: [:album_count])
+                SELECT a0."id", a0."name", a0."biography", a0."previous_names",
+                a0."inserted_at", a0."updated_at", coalesce(s1."aggregate_0", $1::bigint)
+                ::bigint::bigint FROM "artists" AS a0 LEFT OUTER JOIN LATERAL (SELECT
+                sa0."artist_id" AS "artist_id", coalesce(count(*), $2::bigint)::bigint AS
+                "aggregate_0" FROM "public"."albums" AS sa0 WHERE (a0."id" = sa0."artist_id")
+                GROUP BY sa0."artist_id") AS s1 ON TRUE WHERE (a0."name"::text ILIKE $3)
+                ORDER BY a0."id" LIMIT $4 [0, 0, "%a%", 13]
+                {:ok, %Ash.Page.Offset{...}}
+
+            "Finding the Most Recent Album Release Year for an Artist"
+                calculations do
+                    calculate :album_count, :integer, expr(count(albums))
+                    calculate :latest_album_year_released, :integer,
+                        expr(first(albums, field: :year_released))
+                end
+
+            "Finding the Most Recent Album Cover for an Artist
+                Okay so normally we would only want to return the covers for those artists that have an album cover to return but Ash will automatically only return non-nil values, although it can still return nil if needs be. So lets add in the album cover and go from there.
+                calculate :cover_image_url, :string,
+                    expr(first(albums, field: :cover_image_url))
+
+            We have now set all those values that will be triggered with the data that we pull as long as we ask for them. Keep in mind that you will only get the data that you ask for even if you need to calculate an other calculation to get it.
+
     Relationship Calculations as Aggregates
+        There are a bit more indepth than a calculation but use a lot of the same ideas but have a more streamlined syntax we are staying in lib/tunez/music/artist.ex
+            defmodule Tunez.Music.Artist do
+                # ...
+
+                aggregates do
+                    # calculate :album_count, :integer, expr(count(albums))
+                    count :album_count, :albums
+
+                    # calculate :latest_album_year_released, :integer,
+                    # expr(first(albums, field: :year_released))
+                    first :latest_album_year_released, :albums, :year_released
+                    
+                    # calculate :cover_image_url, :string,
+                    # expr(first(albums, field: :cover_image_url))
+                    first :cover_image_url, :albums, :cover_image_url
+                end
+
+        See how much easier it is to ulitize aggreagates. Now lets implement them.
+
+        Using Aggregates like any other Attribute
+            As it sounds we simply need to add the attribute to to the resouce and we are set to go. Head to lib/tunez_web/live/artists/index_live.ex and head to the artist_card function
+                <div id={"artist-#{@artist.id}"} data-role="artist-card" class="relative mb-2">
+                    <.link navigate={~p"/artists/#{@artist.id}"}>
+                        <.cover_image image={@artist.cover_image_url} />
+                    </.link>
+                </div>
+
+            We could add in the other calculations but in this case there is yet an other built-in ASH function to prepare the build which will automatically load those values. This would be the "normal" way to do it.
+                page =
+                Tunez.Music.search_artists!(query_text,
+                    page: page_params,
+                    query: [sort_input: sort_by],
+                    load: [:album_count, :latest_album_year_released, :cover_image_url]
+                )
+
+            Here is an othe way to do it by going into the read :search and setting a prepare build
+                read :search do
+                    # ...
+                    prepare build(load: [:album_count, :latest_album_year_released,
+                        :cover_image_url])
+                end
+
+            For our purposese we will go to lib/tunez/music.ex domain and add in the defaults to the search_artists.
+                define(:search_artists,
+                    action: :search,
+                    args: [:query],
+                    default_options: fn ->
+                    [load: [:album_count, :latest_album_year_released, :cover_image_url]]
+                    end
+                )
+
+            Now let's head back to lib/tunez_web/live/artists/index_live.ex and add in the information that we wanted to load.
+                def artist_card(assigns) do
+                    ~H"""
+                    <% # ... %>
+                    <.artist_card_album_info artist={@artist} />
+                    """
+                end
+
+        Sorting Based on Aggregate Data
+            Now we can even add in some sorting params based off those data options. Still in the index_live.ex add these to the sortig options.
+                defp sort_options do
+                    [
+                    {"recently updated", "-updated_at"},
+                    {"recently added", "-inserted_at"},
+                    {"name", "name"},
+                    {"number of albums", "-album_count"},
+                    {"latest album release", "-latest_album_year_released"}
+                    ]
+                end
+
+            Now we simply make them public and we are set head to lib/tunez/music/artst.ex
+                aggregates do
+                    count :album_count, :albums do
+                        public? true➤
+                    end
+                    first :latest_album_year_released, :albums, :year_released do
+                        public? true➤
+                    end
+                    # ...
+                end
+
+            We did it we are now all set to finish this part of the project!!!
 
 Chapter 4: Generating APIs Without Writing Code (85)
     Model Your Domain, Derive the Results
