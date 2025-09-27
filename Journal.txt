@@ -1343,6 +1343,87 @@ Chapter 4: Generating APIs Without Writing Code (85)
                     end
                     # ...
 
+            "Showing Albums for a Given Artist"
+                There are to ways to include related resources for a given resource. Both will require that the relationship is public. Head to lib/tunez/music/artist.ex to set that now.
+                    relationships do
+                        has_many :albums, Tunez.Music.Album do
+                            sort year_released: :desc
+                            public? true
+                        end
+                    end
+
+            "Including Related Records"
+                The easist way and it mirrors the way we have done things like this before and that is to include it in the json_api parent resource. Like this http://localhost:4000/api/json/artists?query=cove&amp;include=albums
+                    json_api do
+                        type "artist"
+                        includes [:albums]
+                    end
+            
+            "Linking to a List of Related Records"
+                You can add a link the the records that the user might want wit the GET call to the API. This will require heading into lib/tunez/music.ex and adding in a related relationship to the API response.
+                    base_route "/artists", Tunez.Music.Artist do
+                        # ...
+                        related(:albums, :read, primary?: true)
+                    end
+                    
+        Generating API Documentation with OpenApiSpex
+            The installation of AshJsonApi also incluced a way to build some Documentation with ease. We just need to add in the route. Head to lib/tunez_web/ash_json_api_router.ex to see what it already did. http://localhost:4000/api/json/open_api
+                defmodule TunezWeb.AshJsonApiRouter do
+                    use AshJsonApi.Router,
+                        domains: [Tunez.Music],
+                        open_api: "/open_api"
+                end
+
+            Now this is just a json result with all the information but not a clear way of using it you can use the built in funcionality of swaggerui to format it much better. Head to lib/tunez_web/router.ex this will made the route api/json/swaggerui available
+                scope "/api/json" do
+                    pipe_through [:api]
+
+                    forward "/swaggerui", OpenApiSpex.Plug.SwaggerUI,
+                    path: "/api/json/open_api",
+                    default_model_expand_depth: 4
+
+                    forward "/", TunezWeb.AshJsonApiRouter
+                end
+
+        Customizing the Generated API
+            Lets tackle some low hangning fruit and make it look better and work better.
+            
+            "Adding Informative Descriptions"
+                Ash allows us to set some descriptors for all the resources that we have in order to make any Documentation or calls be better understood.
+                    A description for a resource as a whole. or
+                    A description for an action or an arugement for an action
+
+                Take some time and add in a few of those here are some to get you started
+                    defmodule Tunez.Music.Artist do
+                        use Ash.Resource, ...
+                        resource do
+                            description "A person or group of people that makes and releases music."
+                        end
+
+                        read :search do
+                            description "List Artists, optionally filtering by name."
+                            argument :query, :ci_string do
+                                description "Return only artists with names including the given value."
+                                # ...
+
+            "Updating the API Title and Version"
+                Head to lib/tunez_web/ash_json_api_router.ex and then add some lines so that when you are using the route there is a title and version in the heading.
+                    defmodule TunezWeb.AshJsonApiRouter do
+                        use AshJsonApi.Router,
+                            domains: [Tunez.Music],
+                            open_api: "/open_api",
+                            open_api_title: "Tunez API Documentation",
+                            open_api_version: to_string(Application.spec(:tunez, :vsn))
+                    end
+
+            "Removing Unwanted Extras"
+                If you took some time to look through the API docs you see that there is some filtering that we are not using as we have our own setup. You can disable the built in versions if you want and it is with the derive_filter? boolean flag. Head to tunez/music/artist.ex and add this line.
+                    json_api do
+                        type("artist")
+                        includes([:albums])
+                        derive_filter?(false)
+                    end
+
     Building a GraphQL interface
 
 Chapter 5: Authentication: Who Are You? (107)
