@@ -1312,7 +1312,7 @@ Chapter 4: Generating APIs Without Writing Code (85)
                 The PATCH can update and the DELETE can remove an artist.
         
         Adding Albums to the API
-            We can use the same extention to add albums to the API as well. Afterwards we will need to add in the routes and default actions that we want the API route to be able to use.
+            We can use the same extension to add albums to the API as well. Afterwards we will need to add in the routes and default actions that we want the API route to be able to use.
                 mix ash.extend Tunez.Music.Album json_api
             
             Now we need to head to lib/tunez/music.ex to add in the routes as we did before
@@ -1386,12 +1386,12 @@ Chapter 4: Generating APIs Without Writing Code (85)
                 end
 
         Customizing the Generated API
-            Lets tackle some low hangning fruit and make it look better and work better.
+            Lets tackle some low hanging fruit and make it look better and work better.
             
             "Adding Informative Descriptions"
                 Ash allows us to set some descriptors for all the resources that we have in order to make any Documentation or calls be better understood.
                     A description for a resource as a whole. or
-                    A description for an action or an arugement for an action
+                    A description for an action or an argument for an action
 
                 Take some time and add in a few of those here are some to get you started
                     defmodule Tunez.Music.Artist do
@@ -1425,6 +1425,76 @@ Chapter 4: Generating APIs Without Writing Code (85)
                     end
 
     Building a GraphQL interface
+        This is an other way to do the same things but this will do a few different things. We will go over those in the next section.
+
+        Setup
+            Using a similar igniter install we will be doing some different things:
+                Code formatting and configuration for AshGraphql and Absinthe
+                New graphql pipeline and scope for your Phoenix router, taking /gql and /gqp/playground
+                New TunezWeb.GraphqlSchema
+                New TunezWe.GraphqlSocket
+            You can head to http://localhost:4000/gql/playground after we get it all setup.
+                mix igniter.install ash_graphql
+
+            This next bit will go fast as there is a lot that we have done that will look very similar
+        
+        Adding Artists to the API
+            mix ash.extend Tunez.Music.Artist graphql
+
+            We will now need to add in the queries and actions for the new API route. Head to lib/tunez/music.ex and add this new block.
+                graphql do
+                    queries do
+                        get Tunez.Music.Artist, :get_artist_by_id, :read
+                        list Tunez.Music.Artist, :search_artists, :search
+                    end
+                end
+
+            This will create queries named getArtistById and searchArtistById that connects to the read action. We can now now add some non read options that will all be mutations, same file
+                graphql do
+                    # ...
+
+                    mutations do
+                    create Tunez.Music.Artist, :create_artist, :create
+                    update Tunez.Music.Artist, :update_artist, :update
+                    delete Tunez.Music.Artist, :destroy_artist, :destroy
+                    end
+                end
+
+            "What Data Gets Included in API Responses?"
+                We already did this in the previous section so this will not change anything
+
+            "Creating Artist Records"
+                Same as before this will not change.
+        
+        Adding Albums to the API
+            We will use the same ash.extend but for graphql and albums then we will need to set the mutations for the graphql
+                mix ash.extend Tunez.Music.Album graphql
+
+            Then head to lib/tunez/music.ex
+                graphql do
+                    mutations do
+                        # ...    
+                
+                        create Tunez.Music.Album, :create_album, :create
+                        update Tunez.Music.Album, :update_album, :update
+                        destroy Tunez.Music.Album, :destroy_album, :destroy
+                    end
+                end
+
+            "Showing Albums for a Given Artist"
+                Same as we did for the RESTful
+
+        Customizing the Generated API
+            Same as we did before we want to remove the unwanted fields it will be very similar but I will go over the needs for the graphql part
+
+            "Removing Unwanted Extras"
+                Here is where we will set the fields that will allows us to filter results, head to lib/tunez/music/artist.ex make these changes.
+                    graphql do
+                        type :artist
+                        filterable_fields [:album_count, :cover_image_url, :inserted_at, :latest_album_year_released, :updated_at]
+                    end
+
+    That is it for this section hope you learned something.
 
 Chapter 5: Authentication: Who Are You? (107)
     Introducing AshAuthentication
