@@ -1256,7 +1256,7 @@ Chapter 4: Generating APIs Without Writing Code (85)
 
                 mix igniter.install ash_json_api
 
-        Addin Artists to the API
+        Adding Artists to the API
             We will try and implement the CRUD for the API and as such we will need to add each resource and then make them public. We will use the extend Mix task to do so. A couple of things that this will do:
                 AshJsonApi.Resource will be added to make use of the new access point
                 A default API type will be added to the resource.
@@ -1286,21 +1286,62 @@ Chapter 4: Generating APIs Without Writing Code (85)
 
             You can even use the GET route by accessing http://localhost:4000/api/json/artists/?query=and
 
-                "What Data Gets Included in API Responses?
-                    So you might notice that some of the data is missing and that is becuase only the attributes that are made public are included. This is a security thing and can be changed. Lets add the biography and the previous_names to the public list, head to lib/tunez/music/artist.ex
-                        attributes do
-                            # ...
+            "What Data Gets Included in API Responses?
+                So you might notice that some of the data is missing and that is becuase only the attributes that are made public are included. This is a security thing and can be changed. Lets add the biography and the previous_names to the public list, head to lib/tunez/music/artist.ex
+                    attributes do
+                        # ...
 
-                            attribute :previous_names, {:array, :string} do
-                                default []
-                                public? true
-                            end
-
-                            attribute :biography, :string do
-                                public? true
-                            end
-                            # ...
+                        attribute :previous_names, {:array, :string} do
+                            default []
+                            public? true
                         end
+
+                        attribute :biography, :string do
+                            public? true
+                        end
+                        # ...
+                    end
+            
+                Calculations and Aggregates are different as they can be calculation expensive so there are a few ways to make them visible to the API:
+                    Set them as default fields at the resource level. This will be done EVERYTIME that the resource is pulled. 
+                    Make it so that a user can request the specific calculation or aggreagates that they require. They will need to add the field to the query string parameters. Something like http://localhost:4000/api/json/artists?fields=name,album_count . THis is a default response in the ASH framework.
+
+            "Creating Artists Records"
+                There is quite a few routes that were created and we will just go over the post but with the right body and route you can use the API to create an artist as well. 
+
+                The PATCH can update and the DELETE can remove an artist.
+        
+        Adding Albums to the API
+            We can use the same extention to add albums to the API as well. Afterwards we will need to add in the routes and default actions that we want the API route to be able to use.
+                mix ash.extend Tunez.Music.Album json_api
+            
+            Now we need to head to lib/tunez/music.ex to add in the routes as we did before
+                json_api do
+                    routes do
+                        # ...
+
+                        base_route "/albums", Tunez.Music.Album do
+                            post :create
+                            patch :update
+                            delete :destroy
+                        end
+                    end
+
+            We now have the way to work with the albums but we don't have a nice way of dealing with the artist_id that is usually pre-hidden in the HTTP request. We will need to provide a valid ID for that and we will need to head into the album.ex to make those values public. Head to lib/tunez/music/album.ex to make those changes.
+                attributes do
+                    uuid_primary_key :id
+                    attribute :name, :string do
+                        allow_nil? false
+                        public? true
+                    end
+                    attribute :year_released, :integer do
+                        allow_nil? false
+                        public? true
+                    end
+                    attribute :cover_image_url, :string do
+                        public? true
+                    end
+                    # ...
 
     Building a GraphQL interface
 
