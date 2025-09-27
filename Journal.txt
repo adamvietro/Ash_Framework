@@ -1228,10 +1228,10 @@ Chapter 3: Creating a Better Search UI (59)
             Now we simply make them public and we are set head to lib/tunez/music/artst.ex
                 aggregates do
                     count :album_count, :albums do
-                        public? true➤
+                        public? true
                     end
                     first :latest_album_year_released, :albums, :year_released do
-                        public? true➤
+                        public? true
                     end
                     # ...
                 end
@@ -1239,9 +1239,68 @@ Chapter 3: Creating a Better Search UI (59)
             We did it we are now all set to finish this part of the project!!!
 
 Chapter 4: Generating APIs Without Writing Code (85)
-    Model Your Domain, Derive the Results
+    We now want to make an API so that other users can access our data in thier own apps.
     
+    Model Your Domain, Derive the Results
+        In this chapter we will build a REST and GraphQL API for other users to access our data.
+
     Building A JSON REST interface
+        We will use some built in ASH package to generate the API that will accept requests over HTTP and the send the data in a JSON format
+
+        Setup
+            Lets add some features to the app. This will be done with and igniter install, here is what it will do: 
+                ash_json_api Hex package
+                Code formatting and configuration to support a new application/vnd.api+json
+                New TunezWeb.AshJsonApiRouter
+                A new scope for the Phoenix router.
+
+                mix igniter.install ash_json_api
+
+        Addin Artists to the API
+            We will try and implement the CRUD for the API and as such we will need to add each resource and then make them public. We will use the extend Mix task to do so. A couple of things that this will do:
+                AshJsonApi.Resource will be added to make use of the new access point
+                A default API type will be added to the resource.
+            Since it is the first resource for Music it will connect the pieces of the domain
+                AshJsonApi.Domain will be added as an extension of the Tunez.Music domain
+                Tunez.Music will be added to the list of domains in the TunezWeb.AshJsonApiRouter module.
+                mix ash.extend Tunez.Music.Artist json_api
+
+            Now we need to set some of the routes to make the actions on the Artist resource available in the API. We could add the domain or the resource to the API but it makes more sense to add a layer of obfiscation so that a user can only interact with the top layer of the domain. Head to lib/tunez/music.ex
+                defmodule Tunez.Music do
+                    # ...
+                    json_api do
+                            routes do
+                            base_route "/artists", Tunez.Music.Artist do
+                                get :read
+                                index :search
+                                post :create
+                                patch :update
+                                delete :destroy
+                            end
+                        end
+                    end
+                end
+            
+            This will set some default actions for each user for each artist. GET and artist POST will create an artist, and so on. We can check the routes from a the WSL console
+                mix phx.routes
+
+            You can even use the GET route by accessing http://localhost:4000/api/json/artists/?query=and
+
+                "What Data Gets Included in API Responses?
+                    So you might notice that some of the data is missing and that is becuase only the attributes that are made public are included. This is a security thing and can be changed. Lets add the biography and the previous_names to the public list, head to lib/tunez/music/artist.ex
+                        attributes do
+                            # ...
+
+                            attribute :previous_names, {:array, :string} do
+                                default []
+                                public? true
+                            end
+
+                            attribute :biography, :string do
+                                public? true
+                            end
+                            # ...
+                        end
 
     Building a GraphQL interface
 
