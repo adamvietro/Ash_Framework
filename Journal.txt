@@ -1632,8 +1632,114 @@ Chapter 5: Authentication: Who Are You? (107)
 
         Showing the Currently Authenticated User
             It is normal for it to show the current user in the top right so let's do that now. Head to lib/tunez_web/components/layouts.ex and lets add in a line to show the current user.
+                <div class="flex items-center w-full p-4 pb-2 border-b-2 border-primary-600">
+                    <div class="flex-1 mr-4">
+                        <% # ... %>
+                    </div>
+                    <.user_info current_user={@current_user} socket={@socket} />
+                </div>
+            
+            Now we have the line that will show the current user but its not public and we now need to dig into why its not showing the current user.
+
+            "Digging into AshAuthenticationPhoenix's Generated Router Code"
+                Most everything the generator did is perfect but there are a few things that it didn't do for us. It set up some pipelines for load_from_bearer, and load_from_session, these are for the JWT and are able to load the record for the user. But live-view works differently we need to find a way to get the session info into the current session as live-view knows that they are authenticated but not the session that was created for the user. 
+
+                This is where live_session comes in. It's wrapped in ash with AshAuthentication, ash_authentication_live_session, this will make sure that when new sessions are spawned they will have the correct data and will still be secure. So for Tunez we need to make sure that the routes that need to be logged in will be in the ash_authentication_live_session block. so these first routes need to be moved into the correct block. lib/tunez_web/router.ex
+                    scope "/", TunezWeb do
+                        pipe_through :browser
+                        # This is the block of routes to move
+                        live "/", Artists.IndexLive
+                        # ...
+                        live "/albums/:id/edit", Albums.FormLive, :edit
+                        auth_routes AuthController, Tunez.Accounts.User, path: "/auth"
+                        # ...
+                        # will be moved to this should be higher up in the block of code.
+
+                    scope "/", TunezWeb do
+                        pipe_through :browser
+                        ash_authentication_live_session :authenticated_routes do
+                        # This is the location that the block of routes should be moved to
+                        live "/", Artists.IndexLive
+                        # ...
+                        live "/albums/:id/edit", Albums.FormLive, :edit
+                        end
+                    end
+
+        Stylin' and Profilin' with AuthOverrides
+            There is a file that was created to change some of the standard components class names and url images etc. Let's head to lib/tunez_web/auth_overrides.ex. It can be hard to figure out exactly what we want to override here. To maybe help the submit button is an input. Let's override the input component. Within the file you will see some syntax for doing some of the overrides. 
+                # add this into the file
+                override AshAuthentication.Phoenix.Components.Password.Input do
+                    set :submit_class, "bg-primary-600 text-white my-4 py-3 px-5 text-sm"
+                end
+
+            There it is the button is now purple, keep in mind that anything you do here you will change for every instance of the component. They provided a set of overrides in lib/tunez_web/auth_overrides_sample.txt but if don't see it here it is for you.
+                alias AshAuthentication.Phoenix.Components
+
+                override Components.Banner do
+                    set :image_url, nil
+                    set :dark_image_url, nil
+                    set :text_class, "text-8xl text-accent-400"
+                    set :text, "♫"
+                end
+
+                override Components.Password do
+                    set :toggler_class, "flex-none text-primary-600 px-2 first:pl-0 last:pr-0"
+                end
+
+                override Components.Password.Input do
+                    set :field_class, "mt-4"
+                    set :label_class, "block text-sm font-medium leading-6 text-zinc-800"
+                    set :input_class, TunezWeb.CoreComponents.form_input_styles()
+
+                    set :input_class_with_error, [
+                        TunezWeb.CoreComponents.form_input_styles(),
+                        "!border-error-400 focus:!border-error-600 focus:!ring-error-100"
+                    ]
+
+                    set :submit_class, [
+                        "phx-submit-loading:opacity-75 my-4 py-3 px-5 text-sm",
+                        "bg-primary-600 hover:bg-primary-700 text-white",
+                        "rounded-lg font-medium leading-none cursor-pointer"
+                    ]
+
+                    set :error_ul, "mt-2 flex gap-2 text-sm leading-6 text-error-600"
+                end
+
+                override Components.MagicLink do
+                    set :request_flash_text, "Check your email for a sign-in link!"
+                end
+
+                override Components.MagicLink.Input do
+                    set :submit_class, [
+                        "phx-submit-loading:opacity-75 my-8 mx-auto py-3 px-5 text-sm",
+                        "bg-primary-600 hover:bg-primary-700 text-white",
+                        "rounded-lg font-medium leading-none block cursor-pointer"
+                    ]
+                end
+
+                override Components.Confirm.Input do
+                    set :submit_class, [
+                        "phx-submit-loading:opacity-75 my-8 mx-auto py-3 px-5 text-sm",
+                        "bg-primary-600 hover:bg-primary-700 text-white",
+                        "rounded-lg font-medium leading-none block cursor-pointer"
+                    ]
+                end
+
+        Why Do Users Always Forget Their Passwords!?
+            When we did the initial setup for AshAuthentication we did 2 things (senders) that will send emails for confirmation and password reset. SendNewUser ConfirmationEmail SendPasswordResetEmail.
+
+            Phoenix apps come with Swoosh that is designed for sending emails. Each sender function does two things: body/1 (generates content) and send/3 that is for constructing and sending the email. There is going to need a email provider to send the emails. However during production you will need to have a place to hold those emails, it will be at http://localhost:4000/dev/mailbox. 
 
     Setting Up Magic Link Authentication
+        Nowadays there is ways to setup some magic links that will just be sent to a user in order to just use the link to log-in. Ash has this in the box. Lets try the magic link method. With the command below it will do the following:
+            Add a new magic_link authentication strategy to the Tunez.Accounts.User resource, lib/tunez/accounts/user.ex
+            Add to new actions sign_in_with_magic_link and request_magic_link in Tunez.Accounts.User resource.
+            Remove allow_nil? false, on the hashed_password in Tunez.Accounts.User resource.
+            Add a new sender module responsible for generating the magic link email, in lib/tunez/accounts/user/senders/send_magic_link_email.ex
+            mix ash_authentication.add_strategy magic_link
+
+            Then as always migrate
+            mix ash.migrate
 
 Chapter 6: Authorization: What Can You Do? (123)
     Introducing Policies
