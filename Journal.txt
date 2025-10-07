@@ -1612,7 +1612,27 @@ Chapter 5: Authentication: Who Are You? (107)
             You don't need to worry about all of this but again a user will log in and then receive a token that will work for only them.
 
     Automatic UIs with AshAuthenticationPhoenix
-        
+        Now that we have a way to create a user and then get their token we need a UI for that. We will not use an other igniter to get this done, the command is below and it will:
+            Set the config file in .igniter.exs this is the first generator that needs a specific configuration
+            TunezWeb.AuthOverrides module that will customize the look, see (lib/tunez_web/auth_overrides.ex)
+            TunezWeb.AuthController module to securely process sign-in requests. (in lib/tunez_web/controller)
+            TunezWeb.LiveUserAuth module providing a set of hooks we can use in live-views (lib/tunez_web/live_user_auth.ex)
+            updates our router to handle the new plugs and routes (lib/tunez_web/router.ex)
+            mix igniter.install ash_authentication_phoenix
+
+        Okay that is all taken care of but as of right now Igniter doesn't know how to patch JavaScript or CSS files. We need to add Tailwinds live-view paths to the assets. Head to /assets/css/app.css and add in this line
+            /* ... */
+            @source "../../lib/tunez_web";
+            @source "../../deps/ash_authentication_phoenix";
+            
+            @plugin "@tailwindcss/forms";
+            /* ... */
+
+        Now you can head to /sign-in to see the login page. You can create a user (try the one you already made) you will then be redirected to the home page, we will not work on making it look like you are logged in.
+
+        Showing the Currently Authenticated User
+            It is normal for it to show the current user in the top right so let's do that now. Head to lib/tunez_web/components/layouts.ex and lets add in a line to show the current user.
+
     Setting Up Magic Link Authentication
 
 Chapter 6: Authorization: What Can You Do? (123)
