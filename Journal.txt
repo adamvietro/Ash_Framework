@@ -1741,6 +1741,19 @@ Chapter 5: Authentication: Who Are You? (107)
             Then as always migrate
             mix ash.migrate
 
+        Boom We now have the 2 options.
+
+        Debugging When Authentication Goes Wrong
+            We might need to debug, with more robust error messages during dev. In order to do that we can head to /config/dev.exs and add this to the bottom.
+                config :ash_authentication, debug_authentication_failures?: true
+
+            Restart the server and head to the same magic link and you should see more within the error log, what is it telling you is that the link has already been used. Without the robust logging you might never be able to understand what is happening. 
+
+        Can We Allow Authentication over Our API?
+            We can even do all of this over API, First let's set up the command then we can start to lock down the paths over api.
+                mix ash.extend Tunez.Accounts.User json_api
+
+                
 Chapter 6: Authorization: What Can You Do? (123)
     Introducing Policies
 
