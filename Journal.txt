@@ -1753,7 +1753,23 @@ Chapter 5: Authentication: Who Are You? (107)
             We can even do all of this over API, First let's set up the command then we can start to lock down the paths over api.
                 mix ash.extend Tunez.Accounts.User json_api
 
-                
+            This made is sure that we have some new actions and then we need to add in a new route with the action register_with_password action. Head to lib/tunez/accounts.ex
+                defmodule Tunez.Accounts do
+                    use Ash.Domain, otp_app: :tunez, extensions: [AshJsonApi.Domain]
+
+                    json_api do
+                        routes do
+                        base_route "/users", Tunez.Accounts.User do
+                            post(:register_with_password, route: "/register")
+                        end
+                        end
+                    end
+
+                    # ...
+                end
+
+            Okay so we have the new route and much more but at the time we can't use the API as there is too much locked down and we don't want people to change peoples password as the API could allow people to do that. 
+
 Chapter 6: Authorization: What Can You Do? (123)
     Introducing Policies
 
