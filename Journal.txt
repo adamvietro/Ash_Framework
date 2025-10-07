@@ -1,29 +1,29 @@
 Chapter 1: Building Our First Resource (1)
-    Ash is a set of tools you can use to describe and build the Domain Model. For this we will set up the Tunez Application, install Ash, and build our first reasource.
+    Ash is a set of tools you can use to describe and build the Domain Model. For this we will set up the Tunez Application, install Ash, and build our first resource.
 
     Getting the Ball Rolling
         This will be a lightweight spotify app (without the music). 
 
-        Setting Up Your Development Environement
+        Setting Up Your Development Environment
             They created a starter github for this project so run
                 git clone https://github.com/sevenseacat/tunez
                 cd tunez
                 mix setup
                 mix phx.server
 
-            IF all that works you have everthing you need. if not make sure you have asdf and insall the files in the .tool-versions
+            IF all that works you have everything you need. if not make sure you have asdf and install the files in the .tool-versions
 
         Welcome to ASH!!
-            Now that we know its all working we can now be sure to insall an other depedency which is ingiter, this is already ready to go from the Tunez project. This will set some new deps and formatter lines as well as fixing the config to be sure to have all the right depedency.
-                mix igniter.insall ash
+            Now that we know its all working we can now be sure to install an other dependency which is igniter, this is already ready to go from the Tunez project. This will set some new deps and formatter lines as well as fixing the config to be sure to have all the right dependency.
+                mix igniter.install ash
 
             Next we need to set up the post_gres for ash as well. This will do the following add and fetch ash_postgres Hex package, add more autoformatting to config and formatter, update the database to use ASH, update some alias to use ASH instead of Ecto, Generate our first migration, generate the extensions for the config. 
                 mix igniter.install ash_postgres
 
-        Reasources and Domains
+        Resources and Domains
             One of the most important concept is resource in ASH. They are domain model objects (nouns our app revolves around). 
 
-            Related resources are grouped together into Domains. What this means for our app is that we will define several domainds for distinct ideas within the app, Music, Album, Artist, Track User, Notifications
+            Related resources are grouped together into Domains. What this means for our app is that we will define several domains for distinct ideas within the app, Music, Album, Artist, Track User, Notifications
 
             We will set attributes for each. which is data that maps to keys of the resource's struct. 
 
@@ -57,9 +57,9 @@ Chapter 1: Building Our First Resource (1)
             We still need to create the database and there is a command for that (ash.codegen) let's start to look into that now.
 
         Auto-generating Database Migrations
-            If you have run with ecto before you will know that everyting needs to stay up to date and if you update a schema or datebases independently you will not have an up to date DB. Ash will sidestep this and make sure that everything is done together. `mix ash.codegen' will do the following:
-                create shapshots of your current Reasources
-                compare them to the older snapshot (if extisting)
+            If you have run with ecto before you will know that everything needs to stay up to date and if you update a schema or databases independently you will not have an up to date DB. Ash will sidestep this and make sure that everything is done together. `mix ash.codegen' will do the following:
+                create snapshots of your current Resources
+                compare them to the older snapshot (if existing)
                 generate deltas for the changes.
 
             Let's run that command to create the artists. This created a few files for us, so that we can keep everything up to date: a snapshot priv/resource_snapshots/repo/artists/[*].json, and the migration for the artist resource priv/repo/migrations/[*]_create_artists.ex
@@ -90,7 +90,7 @@ Chapter 1: Building Our First Resource (1)
                 mix ash.migrate
 
     Oh, CRUD! - Defining Basic Actions
-        Remember that CRUSD is:
+        Remember that CRUD is:
             Create
             Read
             Update
@@ -116,7 +116,7 @@ Chapter 1: Building Our First Resource (1)
                 })
                 |> Ash.create()
 
-            Now we can see if it did infact work with a psql command
+            Now we can see if it did in-fact work with a psql command
                 psql tunez_dev
                 tunez_dev=# select * from artists;
                     -[ RECORD 1 ]----------------------------------------------
@@ -129,7 +129,7 @@ Chapter 1: Building Our First Resource (1)
             We can now check to see if you can do some other creates with or without name etc.
 
         Creating Records via a Code Interface
-            So we want to now use a Domain to interact with a database so that we can have lower level (reasources) work done through a domain. Let's head to the file /lib/tunez/music.ex. This is a domain.
+            So we want to now use a Domain to interact with a database so that we can have lower level (resources) work done through a domain. Let's head to the file /lib/tunez/music.ex. This is a domain.
                 resources do
                     resource Tunez.Music.Artist do
                         define :create_artist, action: :create
@@ -198,7 +198,7 @@ Chapter 1: Building Our First Resource (1)
                     {:ok, [#Tunez.Music.Artist<...>]}
 
             `Reading a Single Record by Primary Key` 
-                Right now again if we were to try a read it will retieve everything but there is a simple way to use a resource and be able to pass a param and get a record by that param. Head back to the music domain and then add this.
+                Right now again if we were to try a read it will retrieve everything but there is a simple way to use a resource and be able to pass a param and get a record by that param. Head back to the music domain and then add this.
                     define :get_artist_by_id, action: :read, get_by: :id
 
         Defining an Update Action
@@ -263,7 +263,7 @@ Chapter 1: Building Our First Resource (1)
             # Then head to localhost:4000 and check it out.
         
         What you are seeing on the main page is the module in lib/tunez_web/live/artist/index_live.ex. They set us up with some dummy artist but we can replace the artists with a call to the database.
-            artists = Tunez.Music.read_artists!() # Notice the ! this will jsut return the artists not a condition as well
+            artists = Tunez.Music.read_artists!() # Notice the ! this will just return the artists not a condition as well
 
         Viewing an Artist Profile
             Clicking on an image will take you to the profile page using TunezWeb.Artists.ShowLive, again we see that there is some default data here and we can now change the default with get_artist_by_id! (again the !)
@@ -427,11 +427,11 @@ Chapter 1: Building Our First Resource (1)
                     end
                 end
 
-    That is it we now have forms for creating an artist editing an artists and even the funcionality for deleting an artist. There is so much that you can do here to make this easier but we will more on to more functionality.
+    That is it we now have forms for creating an artist editing an artists and even the functionality for deleting an artist. There is so much that you can do here to make this easier but we will more on to more functionality.
  
-Chapter 2: Extending Reasources with Business Logic (33)
-    Reasources and Relationships
-        We have created a single reasource now lets create an album reasource. 
+Chapter 2: Extending Resources with Business Logic (33)
+    Resources and Relationships
+        We have created a single resource now lets create an album resource. 
             mix ash.gen.resource Tunez.Music.Album --extend postgres
 
         We now have some new files, we want to add these things to the DB:
@@ -472,7 +472,7 @@ Chapter 2: Extending Reasources with Business Logic (33)
             Now that we have that setup we can generate and set the migration
                 mix ash.codegen create_album
 
-            We now have the new DB and the relationship between the artist and albums. We still need to index from the foriegn key. to do that we need to head back to album.ex and set the index?: to true
+            We now have the new DB and the relationship between the artist and albums. We still need to index from the foreign key. to do that we need to head back to album.ex and set the index?: to true
                 postgres do
                 # ...
                 references do
@@ -574,8 +574,8 @@ Chapter 2: Extending Reasources with Business Logic (33)
                         form :create_album, args: [:artist_id]
                     end
 
-    Loading Related Reasource Data
-        Now we can make sure that we have the right list of albums within the ShowLive for the artist. We should head to lib/tunez_web/live/artists/show_live.ex then we can agument the artist to also get the album information as well.
+    Loading Related Resource Data
+        Now we can make sure that we have the right list of albums within the ShowLive for the artist. We should head to lib/tunez_web/live/artists/show_live.ex then we can augment the artist to also get the album information as well.
             artist = Tunez.Music.get_artist_by_id!(artist_id, load: [:albums])
             # Now change the assign to remove the album line and the general album as well.
             # change the render as well as we no longer have the value for the :album
@@ -588,11 +588,11 @@ Chapter 2: Extending Reasources with Business Logic (33)
         To go one step further you can even make sure that things are ordered withing the artist album. lib/tunez/music/artist.ex
 
     Structured Data with Validations and Identities
-        Consistant Data with Validations
+        Consistent Data with Validations
             We are going to make sure that when we have a year_released its a valid year and even a valid image URL if we have one, we can even be sure that we are making sure we are not adding the same album twice. Let's head over to lib/music/album.ex
                 validations do
                     validate(
-                    numericality(:year_released,
+                    numerically(:year_released,
                         greater_than: 1950,
                         less_than_or_equal_to: &__MODULE__.next_year/0
                     ),
@@ -684,7 +684,7 @@ Chapter 2: Extending Reasources with Business Logic (33)
                 mix ash.codegen add_previous_names_to_artists
                 mix ash.migrate
 
-            Okay so we have the column in the db for the previous_names, but that isn't enough as we now need to update the actions to not just use the defualt and then we need to be sure to add the names to the list. Same file also make sure to remove the update from the defaults first the general syntax will look like this.
+            Okay so we have the column in the db for the previous_names, but that isn't enough as we now need to update the actions to not just use the default and then we need to be sure to add the names to the list. Same file also make sure to remove the update from the defaults first the general syntax will look like this.
                 update :update do
                     accept([:name, :biography])
                     change(fn changeset, _context -> changeset end)
@@ -751,7 +751,7 @@ Chapter 2: Extending Reasources with Business Logic (33)
 
         Changes Run More Often than You Might Think!
             Keep in mind that any time you: 
-                Building the inital form
+                Building the initial form
                 Authorization checks
                 Every validation check
                 When submitting the form
@@ -833,10 +833,10 @@ Chapter 3: Creating a Better Search UI (59)
                     (a0."name"::text ILIKE $1) ["%co%"]
                     {:ok, [#Tunez.Music.Artist<name: "Crystal Cove", ...>, ...]}
 
-                This did what we want by allowing case-insentive substring matches.
+                This did what we want by allowing case-insensitive substring matches.
 
             Speeding Things Up with Custom Database Indexes
-                This is a very non performant way of doing thing so we can add in a GIN index to help on the name column. First we need to inable it and then start to use it. Let's get it installed first.
+                This is a very non performant way of doing thing so we can add in a GIN index to help on the name column. First we need to enable it and then start to use it. Let's get it installed first.
                     lib/tunes/repo.ex
                     @impl true
                     def installed_extensions do
@@ -867,7 +867,7 @@ Chapter 3: Creating a Better Search UI (59)
                         define :search_artists, action: :search, args: [:query]
                     end
 
-                    We set a new resouce that we can use in music domain. We can now try it out in an iex session.
+                    We set a new resource that we can use in music domain. We can now try it out in an iex session.
                         iex(1)> h Tunez.Music.search_artists
                             def search_artists(query, params \\ nil, opts \\ nil)
                         Calls the search action on Tunez.Music.Artist.
@@ -951,8 +951,8 @@ Chapter 3: Creating a Better Search UI (59)
                         #Tunez.Music.Artist<name: "The Lost Keys", ...>
                     ]}
             
-            But we can use sort_input a bit differently. So we can just set a list of key words and the it will pull from those. But in order to utilize this we need to make some changes to the resource, in order to use it, sort_input will need PUBLIC atrributes. Let's head over to lib/tunez/music/artist.ex
-                atrributes do
+            But we can use sort_input a bit differently. So we can just set a list of key words and the it will pull from those. But in order to utilize this we need to make some changes to the resource, in order to use it, sort_input will need PUBLIC attributes. Let's head over to lib/tunez/music/artist.ex
+                attributes do
                     # ...
                     attribute :name, :string do
                         allow_nil?(false)
@@ -984,7 +984,7 @@ Chapter 3: Creating a Better Search UI (59)
                     # ...
                     artists = Tunez.Music.search_artists!(query_text, query: [sort_input: sort_by])
 
-                # Now just a quick tweek to the sort_options
+                # Now just a quick tweak to the sort_options
                 defp sort_options do
                     [
                         {"recently updated", "-updated_at"},
@@ -996,7 +996,7 @@ Chapter 3: Creating a Better Search UI (59)
         We now can change the way in-which we sort the data and it will update on the URL as well so you can copy and paste a URL to your friends.
             
     Pagination of Search Results
-        Now lets add in some paginagtion so that you can also be sure to have everything in a more consice manner.
+        Now lets add in some pagination so that you can also be sure to have everything in a more concise manner.
 
         Adding Pagination Support to the search Action
             First lets head to lib/tunez/music/artist.ex and add in an other part for the search.
@@ -1017,7 +1017,7 @@ Chapter 3: Creating a Better Search UI (59)
                 >
             
         Showing Paginated Data in the Catalog
-            So now we need to understand what page we are on and the search artists will not have that information. So we can leverage that with the handle_params lib/tunez/live/artists/index_live.ex since it now will return a struct for the page you are recieving not and "artist" 
+            So now we need to understand what page we are on and the search artists will not have that information. So we can leverage that with the handle_params lib/tunez/live/artists/index_live.ex since it now will return a struct for the page you are receiving not and "artist" 
                 def handle_params(params, _url, socket) do
                     # ...
                     page = Tunez.Music.search_artists!(query_text, query: [sort_input: sort_by])
@@ -1046,7 +1046,7 @@ Chapter 3: Creating a Better Search UI (59)
                         sort_by={@sort_by} />
                 </Layouts.app>
 
-                # Now we need to make them work so lets use an other built-in funcionality of ASH. AshPhoenix.LiveView, this will help us determine if or when we can get to an other page. We will do this in the pagination_links function.
+                # Now we need to make them work so lets use an other built-in functionality of ASH. AshPhoenix.LiveView, this will help us determine if or when we can get to an other page. We will do this in the pagination_links function.
                 <div
                     :if={AshPhoenix.LiveView.prev_page?(@page) ||
                         AshPhoenix.LiveView.next_page?(@page)}
@@ -1106,7 +1106,7 @@ Chapter 3: Creating a Better Search UI (59)
                     ...
                 >}
 
-            Now lets add some or funcionality
+            Now lets add some or functionality
                 calculations do
                     calculate :years_ago, :integer, expr(2025 - year_released)
                     calculate :string_years_ago,
@@ -1154,7 +1154,7 @@ Chapter 3: Creating a Better Search UI (59)
             We have now set all those values that will be triggered with the data that we pull as long as we ask for them. Keep in mind that you will only get the data that you ask for even if you need to calculate an other calculation to get it.
 
     Relationship Calculations as Aggregates
-        There are a bit more indepth than a calculation but use a lot of the same ideas but have a more streamlined syntax we are staying in lib/tunez/music/artist.ex
+        There are a bit more in-depth than a calculation but use a lot of the same ideas but have a more streamlined syntax we are staying in lib/tunez/music/artist.ex
             defmodule Tunez.Music.Artist do
                 # ...
 
@@ -1171,10 +1171,10 @@ Chapter 3: Creating a Better Search UI (59)
                     first :cover_image_url, :albums, :cover_image_url
                 end
 
-        See how much easier it is to ulitize aggreagates. Now lets implement them.
+        See how much easier it is to utilize aggregates. Now lets implement them.
 
         Using Aggregates like any other Attribute
-            As it sounds we simply need to add the attribute to to the resouce and we are set to go. Head to lib/tunez_web/live/artists/index_live.ex and head to the artist_card function
+            As it sounds we simply need to add the attribute to to the resource and we are set to go. Head to lib/tunez_web/live/artists/index_live.ex and head to the artist_card function
                 <div id={"artist-#{@artist.id}"} data-role="artist-card" class="relative mb-2">
                     <.link navigate={~p"/artists/#{@artist.id}"}>
                         <.cover_image image={@artist.cover_image_url} />
@@ -1189,14 +1189,14 @@ Chapter 3: Creating a Better Search UI (59)
                     load: [:album_count, :latest_album_year_released, :cover_image_url]
                 )
 
-            Here is an othe way to do it by going into the read :search and setting a prepare build
+            Here is an other way to do it by going into the read :search and setting a prepare build
                 read :search do
                     # ...
                     prepare build(load: [:album_count, :latest_album_year_released,
                         :cover_image_url])
                 end
 
-            For our purposese we will go to lib/tunez/music.ex domain and add in the defaults to the search_artists.
+            For our purposes we will go to lib/tunez/music.ex domain and add in the defaults to the search_artists.
                 define(:search_artists,
                     action: :search,
                     args: [:query],
@@ -1214,7 +1214,7 @@ Chapter 3: Creating a Better Search UI (59)
                 end
 
         Sorting Based on Aggregate Data
-            Now we can even add in some sorting params based off those data options. Still in the index_live.ex add these to the sortig options.
+            Now we can even add in some sorting params based off those data options. Still in the index_live.ex add these to the sorting options.
                 defp sort_options do
                     [
                     {"recently updated", "-updated_at"},
@@ -1225,7 +1225,7 @@ Chapter 3: Creating a Better Search UI (59)
                     ]
                 end
 
-            Now we simply make them public and we are set head to lib/tunez/music/artst.ex
+            Now we simply make them public and we are set head to lib/tunez/music/artist.ex
                 aggregates do
                     count :album_count, :albums do
                         public? true
@@ -1239,7 +1239,7 @@ Chapter 3: Creating a Better Search UI (59)
             We did it we are now all set to finish this part of the project!!!
 
 Chapter 4: Generating APIs Without Writing Code (85)
-    We now want to make an API so that other users can access our data in thier own apps.
+    We now want to make an API so that other users can access our data in their own apps.
     
     Model Your Domain, Derive the Results
         In this chapter we will build a REST and GraphQL API for other users to access our data.
@@ -1265,7 +1265,7 @@ Chapter 4: Generating APIs Without Writing Code (85)
                 Tunez.Music will be added to the list of domains in the TunezWeb.AshJsonApiRouter module.
                 mix ash.extend Tunez.Music.Artist json_api
 
-            Now we need to set some of the routes to make the actions on the Artist resource available in the API. We could add the domain or the resource to the API but it makes more sense to add a layer of obfiscation so that a user can only interact with the top layer of the domain. Head to lib/tunez/music.ex
+            Now we need to set some of the routes to make the actions on the Artist resource available in the API. We could add the domain or the resource to the API but it makes more sense to add a layer of obfuscation so that a user can only interact with the top layer of the domain. Head to lib/tunez/music.ex
                 defmodule Tunez.Music do
                     # ...
                     json_api do
@@ -1287,7 +1287,7 @@ Chapter 4: Generating APIs Without Writing Code (85)
             You can even use the GET route by accessing http://localhost:4000/api/json/artists/?query=and
 
             "What Data Gets Included in API Responses?
-                So you might notice that some of the data is missing and that is becuase only the attributes that are made public are included. This is a security thing and can be changed. Lets add the biography and the previous_names to the public list, head to lib/tunez/music/artist.ex
+                So you might notice that some of the data is missing and that is because only the attributes that are made public are included. This is a security thing and can be changed. Lets add the biography and the previous_names to the public list, head to lib/tunez/music/artist.ex
                     attributes do
                         # ...
 
@@ -1304,7 +1304,7 @@ Chapter 4: Generating APIs Without Writing Code (85)
             
                 Calculations and Aggregates are different as they can be calculation expensive so there are a few ways to make them visible to the API:
                     Set them as default fields at the resource level. This will be done EVERYTIME that the resource is pulled. 
-                    Make it so that a user can request the specific calculation or aggreagates that they require. They will need to add the field to the query string parameters. Something like http://localhost:4000/api/json/artists?fields=name,album_count . THis is a default response in the ASH framework.
+                    Make it so that a user can request the specific calculation or aggregates that they require. They will need to add the field to the query string parameters. Something like http://localhost:4000/api/json/artists?fields=name,album_count . THis is a default response in the ASH framework.
 
             "Creating Artists Records"
                 There is quite a few routes that were created and we will just go over the post but with the right body and route you can use the API to create an artist as well. 
@@ -1353,7 +1353,7 @@ Chapter 4: Generating APIs Without Writing Code (85)
                     end
 
             "Including Related Records"
-                The easist way and it mirrors the way we have done things like this before and that is to include it in the json_api parent resource. Like this http://localhost:4000/api/json/artists?query=cove&amp;include=albums
+                The easiest way and it mirrors the way we have done things like this before and that is to include it in the json_api parent resource. Like this http://localhost:4000/api/json/artists?query=cove&amp;include=albums
                     json_api do
                         type "artist"
                         includes [:albums]
@@ -1367,14 +1367,14 @@ Chapter 4: Generating APIs Without Writing Code (85)
                     end
                     
         Generating API Documentation with OpenApiSpex
-            The installation of AshJsonApi also incluced a way to build some Documentation with ease. We just need to add in the route. Head to lib/tunez_web/ash_json_api_router.ex to see what it already did. http://localhost:4000/api/json/open_api
+            The installation of AshJsonApi also included a way to build some Documentation with ease. We just need to add in the route. Head to lib/tunez_web/ash_json_api_router.ex to see what it already did. http://localhost:4000/api/json/open_api
                 defmodule TunezWeb.AshJsonApiRouter do
                     use AshJsonApi.Router,
                         domains: [Tunez.Music],
                         open_api: "/open_api"
                 end
 
-            Now this is just a json result with all the information but not a clear way of using it you can use the built in funcionality of swaggerui to format it much better. Head to lib/tunez_web/router.ex this will made the route api/json/swaggerui available
+            Now this is just a json result with all the information but not a clear way of using it you can use the built in functionality of swaggerui to format it much better. Head to lib/tunez_web/router.ex this will made the route api/json/swaggerui available
                 scope "/api/json" do
                     pipe_through [:api]
 
@@ -1498,9 +1498,20 @@ Chapter 4: Generating APIs Without Writing Code (85)
 
 Chapter 5: Authentication: Who Are You? (107)
     Introducing AshAuthentication
+        There is 2 part to Authentication for ASH, the core ash_authentication and then the ash_authentication_phoenix. For this chapter we will just be letting the ash installer do most of the work but will be going over each step as is needed. First lets get the right Igniter to install the ash_authentication
+            mix igniter.install ash_authentication
+
+        New Domain, Who's This?
+            So as before we were working with domains and we had Tunez.Music, Authentication is an other type here that will be used to deal with the users. We just made Tunez.Accounts that will have 2 resources, Tunez.Accounts.User and Tunez.Accounts.Token
+
+            Tunez.Accounts.User in lib/tunez/accounts/user.ex is for the Users that we will make and deal with. There is also a DB setup for users in the users database, it doesn't have much at the moment besides ID, and some boilerplate for the configuration
+
+        Tokens and Secrets and Config, Oh My!
+            Tokens, via Tunez.Accounts.Token resource are the secret sauce for AshAuthentication. This is how we will identify a user. They will be provided upon request for every session that a user will need. It should be good right out the box but there are ways to change settings, in the mean time the only thing we need to do now to make this all work is to set up a strategy for the Authentication.
 
     Setting Up Password Authentication
-
+        The normal way that most people will use Authentication is to set up a password and user name and then enter those in-order to access the website. There are other ways of doing this like; OAuth and magic links but we will use the password strategy for this site. It is a simple command line to take care of this.
+            mix ash_authentication.add_strategy password 
     Automatic UIs with AshAuthenticationPhoenix
 
     Setting Up Magic Link Authentication
@@ -1525,18 +1536,18 @@ Chapter 7: Testing Your Application (157)
 
     Consolidating Test Setup Logic
 
-    Testing Reasources
+    Testing Resources
 
     Testing Interfaces
 
 Chapter 8: Having Fun With Nested Forms (179)
     Setting Up a Track Resource
     
-    Managing Relationships for Related Reasources
+    Managing Relationships for Related Resources
 
     Reorder All of the Tracks!!!
 
-    Automatic Converstions Between Seconds and Minutes
+    Automatic Conversions Between Seconds and Minutes
 
     Adding Track Data to API Responses
 

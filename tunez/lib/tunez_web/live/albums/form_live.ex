@@ -113,6 +113,7 @@ defmodule TunezWeb.Albums.FormLive do
       update(socket, :form, fn form ->
         AshPhoenix.Form.validate(form, form_data)
       end)
+
     {:noreply, socket}
   end
 

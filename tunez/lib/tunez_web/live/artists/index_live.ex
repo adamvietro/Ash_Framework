@@ -55,8 +55,7 @@ defmodule TunezWeb.Artists.IndexLive do
         </li>
       </ul>
 
-      <.pagination_links page={@page} query_text={@query_text}
-        sort_by={@sort_by} />
+      <.pagination_links page={@page} query_text={@query_text} sort_by={@sort_by} />
     </Layouts.app>
     """
   end
@@ -113,17 +112,25 @@ defmodule TunezWeb.Artists.IndexLive do
   def pagination_links(assigns) do
     ~H"""
     <div
-      :if={AshPhoenix.LiveView.prev_page?(@page) ||
-        AshPhoenix.LiveView.next_page?(@page)}
+      :if={
+        AshPhoenix.LiveView.prev_page?(@page) ||
+          AshPhoenix.LiveView.next_page?(@page)
+      }
       class="flex justify-center pt-8 space-x-4"
     >
-      <.button_link data-role="previous-page" kind="primary" inverse
+      <.button_link
+        data-role="previous-page"
+        kind="primary"
+        inverse
         patch={~p"/?#{query_string(@page, @query_text, @sort_by, "prev")}"}
         disabled={!AshPhoenix.LiveView.prev_page?(@page)}
       >
         « Previous
       </.button_link>
-      <.button_link data-role="next-page" kind="primary" inverse
+      <.button_link
+        data-role="next-page"
+        kind="primary"
+        inverse
         patch={~p"/?#{query_string(@page, @query_text, @sort_by, "next")}"}
         disabled={!AshPhoenix.LiveView.next_page?(@page)}
       >
