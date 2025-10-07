@@ -1510,10 +1510,109 @@ Chapter 5: Authentication: Who Are You? (107)
             Tokens, via Tunez.Accounts.Token resource are the secret sauce for AshAuthentication. This is how we will identify a user. They will be provided upon request for every session that a user will need. It should be good right out the box but there are ways to change settings, in the mean time the only thing we need to do now to make this all work is to set up a strategy for the Authentication.
 
     Setting Up Password Authentication
-        The normal way that most people will use Authentication is to set up a password and user name and then enter those in-order to access the website. There are other ways of doing this like; OAuth and magic links but we will use the password strategy for this site. It is a simple command line to take care of this.
-            mix ash_authentication.add_strategy password 
-    Automatic UIs with AshAuthenticationPhoenix
+        The normal way that most people will use Authentication is to set up a password and user name and then enter those in-order to access the website. There are other ways of doing this like; OAuth and magic links but we will use the password strategy for this site. It is a simple command line to take care of this. This will add in these bits of code:
+            2 new attributes for Tunez.Accounts.User email and hashed_password
+            Strategies block added to Authentication config in Tunez.Accounts.User resource
+            confirmation add-on added to the add_ons block as part of authentication config in Tunez.Accounts.User, this will require the user to authenticate their emails.
+            A whole set of actions in Tunez.Accounts.Users for signing in. 
+            2 modules to handle sending email confirmations, and password reset.
 
+            mix ash_authentication.add_strategy password 
+        
+        With the mix done you will now need to mix ash.migrate to set up the new repo and db
+            mix ash.migrate
+
+        Testing Authentication Actions in iex
+            One of the actions that we created with the generator is create:register_with_password action. This should take an: email, password, and password_confirmation and creates a user record. Lets test it out.
+                iex -S mix
+                iex(1)> Tunez.Accounts.User
+                Tunez.Accounts.User                
+                iex(2)> |> Ash.Changeset.for_create(:register_with_password, %{email: <<email>>, password: "supersecret", password_confirmation: "supersecret"})
+                #Ash.Changeset<
+                domain: Tunez.Accounts,
+                action_type: :create,
+                action: :register_with_password,
+                attributes: %{email: #Ash.CiString<"***email***">},
+                relationships: %{},
+                arguments: %{
+                    password: "**redacted**",
+                    email: #Ash.CiString<"***email***">,
+                    password_confirmation: "**redacted**"
+                },
+                errors: [],
+                data: %Tunez.Accounts.User{
+                    id: nil,
+                    email: nil,
+                    confirmed_at: nil,
+                    __meta__: #Ecto.Schema.Metadata<:built, "users">
+                },
+                valid?: true
+                >
+                iex(3)> |> Ash.create!(authorize?: false)
+                [debug] QUERY OK db=0.3ms idle=527.3ms
+                begin []
+            
+            This did a few things added a new user into the db, created a token for the user to authenticate and confirm their email, generated an email that will be sent out (This wont be done in dev but all the pluming will be there for it.) Now what can we do with this?  Lets try to authenticate with a faux form to do so.
+                iex(1)> Tunez.Accounts.User
+                Tunez.Accounts.User
+                iex(2)> |> Ash.Query.for_read(:sign_in_with_password, %{email: "***email***", password: "supersecret"})
+                #Ash.Query<
+                resource: Tunez.Accounts.User,
+                action: :sign_in_with_password,
+                arguments: %{
+                    password: "**redacted**",
+                    email: #Ash.CiString<"***email***">
+                },
+                filter: #Ash.Filter<email == #Ash.CiString<"***email***"> and not  is_nil(hashed_password) == "**redacted**">
+                >
+                iex(3)> |> Ash.read(authorize?: false)
+                [debug] QUERY OK source="users" db=1.9ms decode=1.6ms queue=0.8ms idle=765.6ms
+                SELECT u0."id", u0."email", u0."confirmed_at", u0."hashed_password" FROM "users" AS u0 WHERE (u0."email"::citext = ($1::citext)::citext) AND (NOT (u0."hashed_password"::text IS NULL)) ...
+                ↳ AshPostgres.DataLayer.bulk_create/3, at: lib/data_layer.ex:2024
+                {:ok,
+                [
+                %Tunez.Accounts.User{
+                    id: "cd36f5a7-9f3e-460b-bd45-cdc92367dbfe",
+                    email: #Ash.CiString<"***email***">,
+                    confirmed_at: nil,
+                    __meta__: #Ecto.Schema.Metadata<:loaded, "users">
+                }
+                ]}
+
+            Don't forget each line but you should have the user in the db and then you should be able to find the user with these commands. You can even check the token for the user with the right permissions.
+                iex(4)> {:ok, [user]} = v()
+                {:ok,
+                [
+                %Tunez.Accounts.User{
+                    id: "cd36f5a7-9f3e-460b-bd45-cdc92367dbfe",
+                    email: #Ash.CiString<"***email***">,
+                    confirmed_at: nil,
+                    __meta__: #Ecto.Schema.Metadata<:loaded, "users">
+                }
+                ]}
+                iex(5)> user.__metadata__.token
+                "eyJhbGciOiJIUzI1NiIsInR5cCI6Ik..."
+
+            Now lets test out the verification by use the JSON Wet Token (JWT)
+                iex(6)> AshAuthentication.Jwt.verify(user.__metadata__.token, :tunez)
+                [debug] QUERY OK source="tokens" db=0.5ms queue=0.6ms idle=1175.7ms
+                SELECT TRUE FROM "tokens" AS t0 WHERE (t0."purpose"::text = $1::text) AND (t0."jti"::text = $2::text) LIMIT 1 ...
+                "purpose" => "user",
+                "sub" => "user?id=cd36f5a7-9f3e-460b-bd45-cdc92367dbfe"
+                }, Tunez.Accounts.User}
+
+            The interesting part is the purpose and the sub, you can use a JWY's for a variety of reasons for this case we are verifying a user. Now that we have the JWT we can see if a user is using the right JWT and their token.
+                iex(15)> {:ok, claims, resource} = v()
+                {:ok, %{...}, Tunez.Accounts.User}
+                iex(16)> AshAuthentication.subject_to_user(claims["sub"], resource)
+                SELECT u0."id", u0."confirmed_at", u0."hashed_password", u0."email" FROM
+                "users" AS u0 WHERE (u0."id"::uuid::uuid = $1::uuid::uuid) [«uuid»]
+                {:ok, %Tunez.Accounts.User{email: #Ash.CiString<«your email»>, ...}}
+
+            You don't need to worry about all of this but again a user will log in and then receive a token that will work for only them.
+
+    Automatic UIs with AshAuthenticationPhoenix
+        
     Setting Up Magic Link Authentication
 
 Chapter 6: Authorization: What Can You Do? (123)
