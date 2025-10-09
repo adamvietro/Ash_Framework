@@ -2326,7 +2326,37 @@ Chapter 6: Authorization: What Can You Do? (123)
                 >}
 
         Filling Out Policies
-            Now that we have all that done we need to make the policies for the albums. 
+            Now that we have all that done we need to make the policies for the albums. lib/tunez/music/album.ex
+                defmodule Tunez.Music.Album do
+                    use Ash.Resource,
+                        otp_app: :tunez,
+                        domain: Tunez.Music,
+                        data_layer: AshPostgres.DataLayer,
+                        extensions: [AshGraphql.Resource, AshJsonApi.Resource],
+                        authorizers: [Ash.Policy.Authorizer]
+
+            Now we can set the polices
+                policies do
+                    bypass actor_attribute_equals(:role, :admin) do
+                        authorize_if(always())
+                    end
+
+                    policy action(:read) do
+                        authorize_if(always())
+                    end
+
+                    policy action(:create) do
+                        authorize_if(actor_attribute_equals(:role, :editor))
+                    end
+
+                    policy action(:update) do
+                        authorize_if(relates_to_actor(:created_by))
+                    end
+
+                    policy action_type([:update, :destroy]) do
+                        authorize_if(expr(^actor(:role) == :editor and created_by_id == ^actor(:id)))
+                    end
+                end
 
 Chapter 7: Testing Your Application (157)
     What Should We Test?
