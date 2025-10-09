@@ -94,4 +94,9 @@ defmodule Tunez.Music.Album do
     identity :unique_album_names_per_artist, [:artist_id, :name],
       message: "already exists for this artist"
   end
+
+  changes do
+    change relate_actor(:created_by, allow_nil?: true), on: [:create]
+    change relate_actor(:updated_by, allow_nil?: true)
+  end
 end

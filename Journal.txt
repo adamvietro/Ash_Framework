@@ -2287,6 +2287,46 @@ Chapter 6: Authorization: What Can You Do? (123)
                     belongs_to :updated_by, Tunez.Accounts.User
                 end
 
+            As always after a change to the DB we need to codegen and then migrate
+                mix ash.codegen add_user_links_to_artists_and_albums
+                mix ash.migrate
+
+            Okay we have our new relationships now we can set some changes so that you can only do some actions if you are the created or and have the right perms. lib/tunez/music/album.ex
+                defmodule Tunez.Music.Album
+                    # ...
+                    
+                    changes do
+                        change relate_actor(:created_by, allow_nil?: true), on: [:create]
+                        change relate_actor(:updated_by, allow_nil?: true)
+                    end
+                end
+                # Quick note about allow nil here there will be times like scripts that we want to have the created by etc not set as they will not have an owner.
+
+            Lastly we need to unlock the actor in order to created the album etc as right not we don't have access to the actor. We need to head to lib/tunez/accounts/user.ex. This will allow a user to read their own record. 
+                policies do
+                    # ...
+                    
+                    policy action(:read) do
+                        authorize_if expr(id == ^actor(:id))
+                    end
+                end
+
+            Here is some testing results
+                iex(1)> user = Tunez.Accounts.get_user_by_email!(«email», authorize?: false)
+                #Tunez.Accounts.User<id: «uuid», email: «email», role: :admin, ...>
+                iex(2)> Tunez.Music.create_artist(%{name: "Who Made Me?"}, actor: user)
+                {:ok,
+                #Tunez.Music.Artist<
+                name: "Who Made Me?",
+                updated_by_id: «uuid»,
+                created_by_id: «uuid»,
+                updated_by: #Tunez.Accounts.User<id: «uuid», ...>,
+                created_by: #Tunez.Accounts.User<id: «uuid», ...>,
+                ...
+                >}
+
+        Filling Out Policies
+            Now that we have all that done we need to make the policies for the albums. 
 
 Chapter 7: Testing Your Application (157)
     What Should We Test?
