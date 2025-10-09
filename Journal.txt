@@ -1809,25 +1809,63 @@ Chapter 6: Authorization: What Can You Do? (123)
         Looking at this we see that bypass that we will get into later but the AshAuthentication.Checks.AshAuthenticationInteraction is any action from the liveview. The second policy always applies and will fail if... always. This is any other action that is not through liveview again going back to the order of operations. We need to update that so that we can use the API
 
         Writing Our First User Policy
-            Let's first look at what happens without the authoriztion to get a better look at what is happening under the hood.
+            Let's first look at what happens without the authorization to get a better look at what is happening under the hood.
+                iex -S mix
+                iex(1)> Tunez.Accounts.User
+                Tunez.Accounts.User
+                |> Ash.Changeset.for_create(:register_with_password, %{email: "Test@test.com", password: "password", password_confirmation: "password"})
+                #Ash.Changeset<
+                domain: Tunez.Accounts,
+                ...>
+                iex(3)> |> Ash.create()
+                {:error,
+                %Ash.Error.Forbidden{
+                bread_crumbs: ["Error returned from: Tunez.Accounts.User.register_with_password"], 
+                changeset: "#Changeset<>", 
+                errors: [
+                    %Ash.Error.Forbidden.Policy{...}
+                ]}}
 
-            iex -S mix
-            iex(1)> Tunez.Accounts.User
-            Tunez.Accounts.User
-            |> Ash.Changeset.for_create(:register_with_password, %{email: "Test@test.com", password: "password", password_confirmation: "password"})
-            #Ash.Changeset<
-            domain: Tunez.Accounts,
-            ...>
-            iex(3)> |> Ash.create()
-            {:error,
-            %Ash.Error.Forbidden{
-            bread_crumbs: ["Error returned from: Tunez.Accounts.User.register_with_password"], 
-            changeset: "#Changeset<>", 
-            errors: [
-                %Ash.Error.Forbidden.Policy{...}
-            ]}}
+            Let's set some changes to make it so we have some functionality without liveview. Same file but now we change this.
+                policies do
+                    bypass AshAuthentication.Checks.AshAuthenticationInteraction do
+                        authorize_if(always())
+                    end
 
-            
+                    policy action([:register_with_password, :sign_in_with_password]) do
+                        authorize_if(always())
+                    end
+                end
+                # You will not be able to do those action without it failing. Check for yourself. Just make sure to recompile.
+
+        Authentication via JSON
+            Just a quick bit of information I was able to download and install the Postman app [https://www.postman.com/downloads/] in order to send and receive data through the api. I used a general body to send the info but I needed a proper header which was just what it will send and accept ad a return.
+                Content-Type: application/vnd.api+json
+                Accept: application/vnd.api+json
+
+            We tested out a token for sign-in last time and for registration it should be very similar, we need to also be sure the send the token to the user so they can store it and use it later. This is handled for us by AshAuthenticationPhoenix, we can then attach the metadata to the API response, head to lib/tunez/accounts.ex and add these lines.
+                json_api do
+                    routes do
+                        post :register_with_password do
+                            route("/register")
+
+                            metadata(fn _subject, user, _request ->
+                            %{token: user.__metadata__.token}
+                            end)
+                        end
+                    end
+                end
+
+            We can then do the same for sign_in_with_password
+                post :sign_in_with_password do
+                    route("/sign_in")
+                    metadata(fn _subject, user, _request -> %{token: user.__metadata__.token} end)
+                end
+
+        Authenticating via GraphQL
+            This should be easier now that we have added in the policies for the access points. Start off the a linux command line, this will configure the GraphQL schema, domain module, and resource.
+                mix ash.extend Tunez.Accounts.User graphql
+
     Assigning Roles to Users
 
     Writing Policies for Artists
