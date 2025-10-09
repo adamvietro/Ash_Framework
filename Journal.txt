@@ -1957,7 +1957,56 @@ Chapter 6: Authorization: What Can You Do? (123)
             }}
             
     Writing Policies for Artists
-        
+        Now we need to be sure that we are able to use these roles in an Ash Web app, there is 2 things that need to be done:
+            Creating policies for our Resource
+            Updating the interface to specify the actor, as well as hiding some UI for the right actors.
+
+        Creating Our First Artist Policy
+            Okay so let's head to lib/tunez/music/artist.ex and set up the authorizer for the module. 
+                defmodule Tunez.Music.Artist do
+                    use Ash.Resource,
+                        otp_app: :tunez,
+                        domain: Tunez.Music,
+                        data_layer: AshPostgres.DataLayer,
+                        extensions: [AshGraphql.Resource, AshJsonApi.Resource],
+                        authorizers: [Ash.Policy.Authorizer]
+
+            "Testing a create Action"
+                We will get an error because we have nothing for that action (policy) and if there is no policy it will fail
+                    iex -S mix
+                    iex(15)> Tunez.Music.create_artist(%{name: "New Artist"})
+                    {:error,
+                    %Ash.Error.Forbidden{...}}
+
+                We need to head to the artist resource and add in the policy lib/tunez/music/artist.ex, this is again a policy that will always work but we will change that later.
+                    policies do
+                        policy action(:create) do
+                            authorize_if always()
+                        end
+                    end
+
+                Lets add in the policy to make it only work for an admin.
+                    policies do
+                        policy action(:create) do
+                         authorize_if actor_attribute_equals(:role, :admin)
+                        end
+                    end
+
+                Now we can check to see how the iex  session works.
+                    iex(2)> Tunez.Music.create_artist(%{name: "New Artist"})
+                    {:error, %Ash.Error.Forbidden{...}}
+                    iex(3)> Tunez.Music.create_artist(%{name: "New Artist"}, actor: nil)
+                    {:error, %Ash.Error.Forbidden{...}}
+                    iex(4)> editor = %Tunez.Accounts.User{role: :editor}
+                    #Tunez.Accounts.User<role: :editor, ...>
+                    iex(5)> Tunez.Music.create_artist(%{name: "New Artist"}, actor: editor)
+                    {:error, %Ash.Error.Forbidden{...}}
+                    iex(6)> admin = %Tunez.Accounts.User{role: :admin}
+                    #Tunez.Accounts.User<role: :admin, ...>
+                    iex(7)> Tunez.Music.create_artist(%{name: "New Artist"}, actor: admin)
+                    {:ok, #Tunez.Music.Artist<...>}
+            
+                
     Removing Forbidden Actions from the UI
 
     Writing Policies for Albums
