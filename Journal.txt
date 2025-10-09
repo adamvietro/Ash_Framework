@@ -2006,7 +2006,30 @@ Chapter 6: Authorization: What Can You Do? (123)
                     iex(7)> Tunez.Music.create_artist(%{name: "New Artist"}, actor: admin)
                     {:ok, #Tunez.Music.Artist<...>}
             
+        Filling Out Update and Destroy Policies
+            Now let's figure out who can update and destroy anything. lib/tunez/music/artist.ex
+                policies
+                    policy action(:update) do
+                        authorize_if actor_attribute_equals(:role, :admin)
+                        authorize_if actor_attribute_equals(:role, :editor)
+                    end
+                        policy action(:destroy) do
+                        authorize_if actor_attribute_equals(:role, :admin)
+                    end
                 
+            "Cutting Out Repetitiveness with Bypasses"
+                There is a way to avoid having to make a policy for every admin as we can set a bypass to make all actions work for that role. 
+                    bypass actor_attribute_equals(:role, :admin) do
+                        authorize_if always()
+                    end
+                
+                With this set we can get rid of any polices that calls admin, and remember that if you don't have a policy for a role it will not work!!! Here are 2 things to keep in mind:
+                    Keep all bypass policies together at the start of the policies block, and don’t intermingle them with standard policies.
+                    • Write naive tests for your policies that test as many combinations of permissions as possible to verify that the behavior is what you expect. 
+            
+            "Debugging when Policies Fail"
+                
+
     Removing Forbidden Actions from the UI
 
     Writing Policies for Albums
