@@ -2028,9 +2028,41 @@ Chapter 6: Authorization: What Can You Do? (123)
                     • Write naive tests for your policies that test as many combinations of permissions as possible to verify that the behavior is what you expect. 
             
             "Debugging when Policies Fail"
-                
+                There is yet and other more robust debug that you can set to true in order to see more information about any failures. In config/deb.exs there is this line.
+                    config :ash, policies: [show_policy_breakdowns?: true]
+
+                Trying to do the same thing as create withou the right permissions will result in an error
+                    iex(1)> editor = %Tunez.Accounts.User{role: :editor}
+                    #Tunez.Accounts.User<...>
+                    iex(2)> Tunez.Music.create_artist!(%{name: "Oh no!"}, actor: editor)
+                    ** (Ash.Error.Forbidden)
+                    Bread Crumbs:
+                    > Error returned from: Tunez.Music.Artist.create
+                    Forbidden Error
+                    * forbidden:
+                    Tunez.Music.Artist.create
+                    Policy Breakdown
+                    user: %{id: nil}
+                    Policy | [M]:
+                    condition: action == :create
+                    authorize if: actor.role == :admin | ✘ | [M]
+                    SAT Solver statement:
+                    "action == :create" and
+                    (("action == :create" and "actor.role == :admin")
+                    or not "action == :create")
+                    Removing Forbidden Actions from the UI
+
+        Filtering Results in read Action Policies
+            Reads are a bit different as they are about filtering and giver entries that can satisfy a yes/no about a column. We won't modify too much here but the issues is that we might want to make it so an admin will see all records and a a normal user might not be able to see those. Either way we need to have a blanket policy for reads as again not policy no go. lib/tunez/music/artist.ex
+                policies do
+                    # ...
+                    policy action_type(:read) do
+                        authorize_if(always())
+                    end
+                end
 
     Removing Forbidden Actions from the UI
+        
 
     Writing Policies for Albums
 
