@@ -2031,7 +2031,7 @@ Chapter 6: Authorization: What Can You Do? (123)
                 There is yet and other more robust debug that you can set to true in order to see more information about any failures. In config/deb.exs there is this line.
                     config :ash, policies: [show_policy_breakdowns?: true]
 
-                Trying to do the same thing as create withou the right permissions will result in an error
+                Trying to do the same thing as create without the right permissions will result in an error
                     iex(1)> editor = %Tunez.Accounts.User{role: :editor}
                     #Tunez.Accounts.User<...>
                     iex(2)> Tunez.Music.create_artist!(%{name: "Oh no!"}, actor: editor)
@@ -2123,8 +2123,170 @@ Chapter 6: Authorization: What Can You Do? (123)
                 )
 
         Updating Form to identify Actor
+            This is where we utilize more Ash in order to only display the right things if we have the right roles. There is the AshPhoenix.Form.ensure_can_submit!(). lib/tunez_web/live/artists/form_live.ex
+                def mount(%{"id" => artist_id}, _session, socket) do
+                    # ...
+
+                    form =
+                    Tunez.Music.form_to_update_artist(
+                        artist,
+                        actor: socket.assigns.current_user
+                    )
+                    |> AshPhoenix.Form.ensure_can_submit!()
+
+                def mount(_params, _session, socket) do
+                    form = Tunez.Music.form_to_create_artist(
+                        actor: socket.assigns.current_user
+                    )
+                    |> AshPhoenix.Form.ensure_can_submit!()
+
+                Now we can make the same changes to the album as well. lib/tunez_web/live/albums/form_live.ex
+                    def mount(%{"id" => album_id}, _session, socket) do
+                        # ...
+                        form =
+                        Tunez.Music.form_to_update_album(
+                            album,
+                            actor: socket.assigns.current_user
+                        )
+                        |> AshPhoenix.Form.ensure_can_submit!()
+
+                    def mount(%{"artist_id" => artist_id}, _session, socket) do
+                        # ...
+                        form = Tunez.Music.form_to_create_album(
+                            artist_id,
+                            actor: socket.assigns.current_user
+                        )
+                        |> AshPhoenix.Form.ensure_can_submit!()
+
+        Blocking Pages from Unauthorized Access
+            When we installed AshAuthenticationPhoenix there was some built-in features that we can use to be sure that we have a logged in user, during the on mount function. The live_user_optional function head will will not care if there is a user or not, live_no_user will redirect away if there is a user logged in, lastly live_user_required will require a user logged in. This below is a general syntax to use it.
+                defmodule Tunez.Accounts.ForAuthenticatedUsersOnly do
+                    use TunezWeb, :live_view
+                        # or :live_user_optional, or :live_no_user
+                        on_mount {TunezWeb.LiveUserAuth, :live_user_required}
+                        # ...
+
+            Let's use it in our app. lib/tunez_web/live_user_auth.ex this is where we can set some functionality to what happens on mount, lib/tunez_web/live_user_auth.ex
+                def on_mount([role_required: role_required], _, _, socket) do
+                    current_user = socket.assigns[:current_user]
+
+                    if current_user && current_user.role == role_required do
+                    {:cont, socket}
+                    else
+                    socket =
+                        socket
+                        |> Phoenix.LiveView.put_flash(:error, "Unauthorized!")
+                        |> Phoenix.LiveView.redirect(to: ~p"/")
+
+                    {:halt, socket}
+                    end
+                end
+
+            This will allow us to leverage on on_mount for a given page. Like so...
+                defmodule Tunez.Accounts.ForAdminsOnly do
+                    use TunezWeb, :live_view
+                    on_mount {TunezWeb.LiveUserAuth, role_required: :admin}
+                    # ...
+
+            Hiding Calls to Action That the Actor Can't Perform
+                There are many different buttons all throughout the app that a user can and can't use depending on the role the user has. There must be a way to check to see if a user can do an action, that is where Ash.can? comes in.
+
+                "Ash.can?"
+                    Ash.can?16 is a pretty low-level function. It takes a tuple representing the action to call and an actor, runs the authorization checks for the action, and returns a boolean representing whether or not the action is authorized:
+                        iex(1)> Ash.can?({Tunez.Music.Artist, :create}, nil)
+                        false
+                        iex(2)> Ash.can?({Tunez.Music.Artist, :create}, %{role: :admin})
+                        true
+                        iex(3) artist = Tunez.Music.get_artist_by_id!(«uuid»)
+                        #Tunez.Music.Artist<id: «uuid», ...>
+                        iex(4)> Ash.can?({artist, :update}, %{role: :user})
+                        false
+                        iex(5)> Ash.can?({artist, :update}, %{role: :editor})
+                        true
+
+                can_*? Code Interface Functions
+                    We call these can_*? functions because the names are dynamically generated based on the name of the code interface. For our Tunez.Music domain, for example, iex shows a whole set of functions with the can_ prefix:
+                        iex(1)> Tunez.Music.can_
+                        can_create_album/1 can_create_album/2 can_create_album/3
+                        can_create_album?/1 can_create_album?/2 can_create_album?/3
+                        can_create_artist/1 can_create_artist/2 can_create_artist/3
+                        ...
+
+                    Now that we have these tools we can add checks for all the buttons on the app. There will be a few that need to be done so let's get started.
+
+                    lib/tunez_web/live/artists/index_live.ex
+                        <:action :if={Tunez.Music.can_create_artist?(@current_user)}>
+                            <.button_link navigate={~p"/artists/new"} kind="primary">
+                                New Artist
+                            </.button_link>
+                        </:action>
+
+                    lib/tunez_web/live/artists/show_live.ex
+                        <:action :if={Tunez.Music.can_destroy_artist?(@current_user, @artist)}>
+                            <.button_link
+                                kind="error"
+                                inverse
+                                data-confirm={"Are you sure you want to delete #{@artist.name}?"}
+                                phx-click="destroy-artist"
+                            >
+                                Delete Artist
+                            </.button_link>
+                        </:action>
+                        <:action :if={Tunez.Music.can_update_artist?(@current_user, @artist)}>
+                            <.button_link navigate={~p"/artists/#{@artist.id}/edit"} kind="primary" inverse>
+                                Edit Artist
+                            </.button_link>
+                        </:action>
+
+                    lib/tunez_web/live/artists/show_live.ex
+                        # This is in render 
+                        <.button_link navigate={~p"/artists/#{@artist.id}/albums/new"} kind="primary"
+                            :if={Tunez.Music.can_create_album?(@current_user, @artist)}>
+                            New Album
+                        </.button_link>
+
+                        # This is in the album details section.
+                        <:action :if={Tunez.Music.can_destroy_album?(@current_user, @album)}>
+                            <.button_link
+                            size="sm"
+                            inverse
+                            kind="error"
+                            data-confirm={"Are you sure you want to delete #{@album.name}?"}
+                            phx-click="destroy-album"
+                            phx-value-id={@album.id}
+                            >
+                            Delete
+                            </.button_link>
+                        </:action>
+                        <:action :if={Tunez.Music.can_update_album?(@current_user, @album)}>
+                            <.button_link size="sm" kind="primary" inverse navigate={~p"/albums/#{@album.id}/edit"}>
+                            Edit
+                            </.button_link>
+                        </:action>
+
+                        # This is in render
+                        <ul class="mt-10 space-y-6 md:space-y-10">
+                            <li :for={album <- @artist.albums}>
+                                <.album_details album={album} current_user={@current_user} />
+                            </li>
+                        </ul>
 
     Writing Policies for Albums
+        Now we just want to be able to change some policies for the artists is as such:
+            Everyone can read all artist data
+            Editors can update (but not delete) artists.
+            Admins can perform all actions
+
+        Now we want to deal with albums we need to worry about editors being able to create albums and then edit/delete only those that they created.
+
+        Recording Who Created and Last Modified a Resource
+            We now need to create a relationship for the User in the album.ex so that we can keep track of who created and who last updated a record. lib/tunez/music/album.ex then do the same thing to Tunez.Music.Artists
+                relationships do
+                    # ...
+                    belongs_to :created_by, Tunez.Accounts.User
+                    belongs_to :updated_by, Tunez.Accounts.User
+                end
+
 
 Chapter 7: Testing Your Application (157)
     What Should We Test?
