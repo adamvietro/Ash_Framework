@@ -2062,7 +2062,67 @@ Chapter 6: Authorization: What Can You Do? (123)
                 end
 
     Removing Forbidden Actions from the UI
-        
+        Right now it will show all buttons no matter what the user role is there is a few things that we need to do in order to make sure that we only show the right information for each user:
+            Update the actions to pass the current user
+            Update forms to ensure that we only let the actor see the forms if they can submit them
+            Update our templates to show show buttons if they have the right perms.
+
+        Identifying the Actor When Calling Actions
+            This could be the hardest part of the app in a larger scale version in our case the only action that are called directly are read and destroy. Tunez.Music.search_artists/2 in Tunez.Artists.IndexLive. We don't need to pass the actor as for NOW we allow all roles to search but that might change in the future. So let's get the information. lib/tunez_web/live/artists/index_live.ex
+                 def handle_params(params, _url, socket) do
+                    sort_by = Map.get(params, "sort_by") |> validate_sort_by()
+                    query_text = Map.get(params, "q", "")
+                    page_params = AshPhoenix.LiveView.page_from_params(params, 12)
+
+                    page =
+                        Tunez.Music.search_artists!(query_text,
+                            query: [sort_input: sort_by],
+                            page: page_params,
+                            actor: socket.assigns.current_user
+                        )
+                
+            Tunez.Music.get_artist_by_id/2 in Tunez.Artist.ShowLive, same as above let's add in the actor so we can use it later. lib/tunez_web/live/artists/show_live.ex
+                artist =
+                    Tunez.Music.get_artist_by_id!(artist_id,
+                        load: [:albums],
+                        actor: socket.assigns.current_user
+                    )
+
+            Tunez.Music.get_artist_by_id/2, in Tunez.Artists.FormLive. Same as before! lib/tunez_web/live/artists/form_live.ex
+                artist =
+                    Tunez.Music.get_artist_by_id!(artist_id,
+                        load: [:albums],
+                        actor: socket.assigns.current_user
+                    )
+
+            Tunez.Music.destroy_artist/2, in Tunez.Artists.ShowLive. We need to pass the actor in here to make it work, as only specific types of users can delete artists. lib/tunez_web/live/artists/show_live.ex
+                def handle_event("destroy-artist", _params, socket) do
+                    case Tunez.Music.destroy_artist(
+                        socket.assigns.artist,
+                        actor: socket.assigns.current_user
+                    ) do
+
+            Tunez.Music.destroy_album/2, in Tunez.Artists.ShowLive. We haven’t added policies for albums yet, but it doesn’t hurt to start updating our templates to support them.
+                def handle_event("destroy-album", %{"id" => album_id}, socket) do
+                    case Tunez.Music.destroy_album(
+                        album_id,
+                        actor: socket.assigns.current_user
+                    ) do
+
+            Tunez.Music.get_album_by_id/2, in Tunez.Albums.FormLive. Same as before. lib/tunez_web/live/albums/form_live.ex
+                def mount(%{"id" => album_id}, _session, socket) do
+                    album = Tunez.Music.get_album_by_id!(album_id,
+                        load: [:artist],
+                        actor: socket.assigns.current_user
+                    )
+
+            Tunez.Music.get_artist_by_id/2, in Tunez.Albums.FormLive. Same as before! Same file.
+                def mount(%{"artist_id" => artist_id}, _session, socket) do
+                artist = Tunez.Music.get_artist_by_id!(artist_id,
+                    actor: socket.assigns.current_user
+                )
+
+        Updating Form to identify Actor
 
     Writing Policies for Albums
 

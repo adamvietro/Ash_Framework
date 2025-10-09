@@ -17,7 +17,11 @@ defmodule TunezWeb.Artists.IndexLive do
     page_params = AshPhoenix.LiveView.page_from_params(params, 12)
 
     page =
-      Tunez.Music.search_artists!(query_text, query: [sort_input: sort_by], page: page_params)
+      Tunez.Music.search_artists!(query_text,
+      query: [sort_input: sort_by],
+      page: page_params,
+      actor: socket.assigns.current_user
+    )
 
     socket =
       socket
