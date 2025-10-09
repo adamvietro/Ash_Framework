@@ -1900,7 +1900,7 @@ Chapter 6: Authorization: What Can You Do? (123)
                 end
             end
 
-        But there is a better way and we can just make a role.ex module and then refrence that in the user.ex module.
+        But there is a better way and we can just make a role.ex module and then reference that in the user.ex module.
             lib/tunez/account/role.ex
             defmodule Tunez.Accounts.Role do
                 use Ash.Type.Enum, values: [:admin, :editor, :user]
@@ -1916,9 +1916,48 @@ Chapter 6: Authorization: What Can You Do? (123)
             mix ash.codegen add_role_to_user
             mix ash.migrate
 
+        Okay so now that we have the new migration and db we need a way to set and update the role for a user as everyone will be a user to start and no one will ever be an admin or editor. We can simply set a new action update :set_role that will accept role. lib/tunez/accounts/user.ex
+            actions do
+                defaults [:read]
 
+                update :set_role do
+                    accept [:role]
+                end
+
+                # ...
+            end
+
+        Now that we have that set we need to update the domain to be able to use the new action for the resource. lib/tunez/accounts.ex
+            resources do
+                # ...
+                resource(Tunez.Accounts.User) do
+                    define :set_user_role, action: :set_role, args: [:role]
+                    define :get_user_by_email, action: :get_by_email, args: [:email]
+                end
+            end
+
+        As we should only be running these from the console we don't need the authorize? false, once this is set and you have an account make it an admin like so
+            iex -S mix
+            iex(12)> user = Tunez.Accounts.get_user_by_email!(<email>, authorize?: false)
+            %Tunez.Accounts.User{
+            id: "9cb1d8b7-9231-4d16-930e-8e87a6db97ce",
+            email: #Ash.CiString<<email>>,
+            confirmed_at: ~U[2025-10-07 22:06:04.300165Z],
+            role: :user,
+            __meta__: #Ecto.Schema.Metadata<:loaded, "users">
+            }
+            iex(13)> Tunez.Accounts.set_user_role(user, :admin, authorize?: false)
+            {:ok,
+            %Tunez.Accounts.User{
+            id: "9cb1d8b7-9231-4d16-930e-8e87a6db97ce",
+            email: #Ash.CiString<<email>>,
+            confirmed_at: ~U[2025-10-07 22:06:04.300165Z],
+            role: :admin,
+            __meta__: #Ecto.Schema.Metadata<:loaded, "users">
+            }}
+            
     Writing Policies for Artists
-    
+        
     Removing Forbidden Actions from the UI
 
     Writing Policies for Albums
