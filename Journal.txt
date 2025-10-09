@@ -1866,6 +1866,23 @@ Chapter 6: Authorization: What Can You Do? (123)
             This should be easier now that we have added in the policies for the access points. Start off the a linux command line, this will configure the GraphQL schema, domain module, and resource.
                 mix ash.extend Tunez.Accounts.User graphql
 
+            AshGraphql is strict in regards to which type of actions can do which. Mutations and queries are the 2 forms that we will work with Reads will be queries and updates, creates, etc will be mutations. Lets create the mutation for register_with_password, lib/tunez/accounts.ex
+                graphql do
+                    mutations do
+                     create(Tunez.Accounts.User, :register_user, :register_with_password)
+                    end
+                end
+
+            Now just do similar for the sign_in_with_password but use the queries using the get macro
+                queries do
+                    get(Tunez.Accounts.User, :sign_in_user, :sign_in_with_password)
+                end
+
+            We will get an error as they way that GraphQL works is that it has more fields for the return data and as such it doesn't know what to do with the token we can now add in a line to describe what to do with the Token
+                get(Tunez.Accounts.User, :sign_in_user, :sign_in_with_password) do
+                    type_name :user_with_token
+                end
+
     Assigning Roles to Users
 
     Writing Policies for Artists
