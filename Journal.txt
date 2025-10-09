@@ -1771,10 +1771,63 @@ Chapter 5: Authentication: Who Are You? (107)
             Okay so we have the new route and much more but at the time we can't use the API as there is too much locked down and we don't want people to change peoples password as the API could allow people to do that. 
 
 Chapter 6: Authorization: What Can You Do? (123)
+    We have the app in a good place so that we can do everything we want but the permissions aren't all set up and the API doesn't have any Authorization. We want to also make act different when you are logged in and when you are not logged in. 
+    
     Introducing Policies
+        This is where we set the policies. Ash will check internally for all the policies before any action takes place if one fails then it will not happen.
 
+        We write them once and then they will be done everywhere. At it's core we need to understand who is running the actions so we need to define the actors well. The policy is made up of 2 things:
+            One or more policy conditions, helps to determine whether or not the policy applies to a situation.
+            A set of policy checks, that will pass or fail. There is a check condition and then an action if it passes. 
+
+        Lets say we were building a blog site a check might look like. 
+            defmodule Blog.Post do
+                use Ash.Resource, authorizers: [Ash.Policy.Authorizer]
+                    policies do
+                        policy action(:publish) do
+                            forbid_if expr(published == true)
+                            authorize_if actor_attribute_equals(:role, :admin)
+                        end
+                    end
+                end
+            # This will check during an publish action and not do it is already published or if they are not an admin.
+
+        Decisions, Decisions
+            For a policy we need to think of it as a cond statement. The check will be evaluated in order and if one succeeds then it will run, order matters here. If nothing makes a decision then it will fail and nothing will happen. 
+        
     Authorizing API Access for Authentication
+        Let's start to use this in our app. There are some basic setting that are set already head to lib/tunez/accounts/user.ex
+            policies do
+                bypass AshAuthentication.Checks.AshAuthenticationInteraction do
+                    authorize_if(always())
+                end
 
+                policy always() do
+                    forbid_if(always())
+                end
+
+        Looking at this we see that bypass that we will get into later but the AshAuthentication.Checks.AshAuthenticationInteraction is any action from the liveview. The second policy always applies and will fail if... always. This is any other action that is not through liveview again going back to the order of operations. We need to update that so that we can use the API
+
+        Writing Our First User Policy
+            Let's first look at what happens without the authoriztion to get a better look at what is happening under the hood.
+
+            iex -S mix
+            iex(1)> Tunez.Accounts.User
+            Tunez.Accounts.User
+            |> Ash.Changeset.for_create(:register_with_password, %{email: "Test@test.com", password: "password", password_confirmation: "password"})
+            #Ash.Changeset<
+            domain: Tunez.Accounts,
+            ...>
+            iex(3)> |> Ash.create()
+            {:error,
+            %Ash.Error.Forbidden{
+            bread_crumbs: ["Error returned from: Tunez.Accounts.User.register_with_password"], 
+            changeset: "#Changeset<>", 
+            errors: [
+                %Ash.Error.Forbidden.Policy{...}
+            ]}}
+
+            
     Assigning Roles to Users
 
     Writing Policies for Artists
