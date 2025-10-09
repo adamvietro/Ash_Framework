@@ -1884,6 +1884,38 @@ Chapter 6: Authorization: What Can You Do? (123)
                 end
 
     Assigning Roles to Users
+        For this app we don't need super robust roles just we need roles that will take care of the following:
+            Basic no modification
+            Editors create/update a limited set
+            Admins any action across the app
+
+        This role will be stored in the Tunez.Accounts.User and will be named role. So lets head to lib/tunez/accounts/user.ex
+            attributes do
+                # ...
+                
+                attribute :role, :atom do
+                    allow_nil? false
+                    default :user
+                    constraints [one_of: [:user, :editor, :admin]]
+                end
+            end
+
+        But there is a better way and we can just make a role.ex module and then refrence that in the user.ex module.
+            lib/tunez/account/role.ex
+            defmodule Tunez.Accounts.Role do
+                use Ash.Type.Enum, values: [:admin, :editor, :user]
+            end
+        
+            lib/tunez/account/user.ex
+                attribute :role, Tunez.Accounts.Role do
+                    allow_nil? false
+                    default :user
+                end
+
+        Now we just need to codegen and then migrate
+            mix ash.codegen add_role_to_user
+            mix ash.migrate
+
 
     Writing Policies for Artists
     
