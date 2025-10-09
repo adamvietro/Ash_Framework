@@ -122,7 +122,7 @@ defmodule Tunez.Music.Album do
     end
 
     policy action(:update) do
-      authorize_if(relates_to_actor(:created_by))
+      authorize_if(relates_to_actor_via(:created_by))
     end
 
     policy action_type([:update, :destroy]) do
