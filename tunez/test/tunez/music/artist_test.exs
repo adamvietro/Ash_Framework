@@ -4,9 +4,24 @@ defmodule Tunez.Music.ArtistTest do
   alias Tunez.Music, warn: false
 
   describe "Tunez.Music.read_artists!/0-2" do
-    @tag :skip
     test "when there is no data, nothing is returned" do
-      # assert Music.read_artists!() == []
+      assert Music.read_artists!() == []
+    end
+  end
+
+  describe "Tunez.Music.search_artists!/1-3" do
+    test "can find artists by partial name match" do
+      artist =
+        Tunez.Music.create_artist!(
+          %{
+            name: "The Froody Dudes",
+            biography: "42 musicians all playing the same instrument (a towel)"
+          },
+          authorize?: false
+        )
+
+      assert %{results: [match]} = Tunez.Music.search_artists!("Frood")
+      assert match.id == artist.id
     end
   end
 
