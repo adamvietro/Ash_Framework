@@ -2750,6 +2750,13 @@ Chapter 7: Testing Your Application (157)
         Testing Phoenix LiveView
             Testing user interfaces is entirely different than anything else that we’ve discussed thus far. There are whole books dedicated solely to this topic. LiveView itself has many testing utilities, and often when testing LiveView, we’re testing much more than the functionality of our application core.
 
+    Fixing "pg-trgm" Error
+        ** (Postgrex.Error) ERROR 0A000 (feature_not_supported) extension "pg-trgm" is not available
+
+        hint: The extension must first be installed on the system where PostgreSQL is running.
+
+        Want to figure out why this is not working need to test this for the tunez_test db.
+
 Chapter 8: Having Fun With Nested Forms (179)
     Setting Up a Track Resource
     
