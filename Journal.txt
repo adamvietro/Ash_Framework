@@ -2742,10 +2742,13 @@ Chapter 7: Testing Your Application (157)
         Everything so far has been about resources or actions, but there will be needs to test the interface. So that you know that a user will have the same experience.
 
         Testing GraphQL
+            Since AshGraphql is built on top of the excellent absinthe library, we can use its great utilities22 for testing. It offers three different approaches for testing either resolvers, documents, or HTTP requests.
 
         Testing AshJsonApi
+            Everything we previously said for testing a GraphQL API applies to testing an API built with AshJsonApi as well. Since we generate an OpenAPI specification for your API, you can even use the same strategy for guarding against breaking changes.
 
         Testing Phoenix LiveView
+            Testing user interfaces is entirely different than anything else that we’ve discussed thus far. There are whole books dedicated solely to this topic. LiveView itself has many testing utilities, and often when testing LiveView, we’re testing much more than the functionality of our application core.
 
 Chapter 8: Having Fun With Nested Forms (179)
     Setting Up a Track Resource
