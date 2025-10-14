@@ -25,6 +25,32 @@ defmodule Tunez.Music.ArtistTest do
     end
   end
 
+  describe "Tunez.Music.update_artist!/1-3" do
+    test "when an artist's name is updated, the biography length does
+                            not cause a validation error" do
+      artist =
+        Ash.Seed.seed!(%Tunez.Music.Artist{
+          name: "The Froody Dudes",
+          biography: "42 musicians all playing the same instrument (a towel)."
+        })
+
+      updated_artist = Tunez.Music.update_artist!(artist, %{name: "New Name"})
+      assert updated_artist.name == "New Name"
+    end
+  end
+
+  # # Demonstration test - this is only to show how to call generators!
+  # defmodule Tunez.Accounts.UserTest do
+  #   import Tunez.Generator
+
+  #   test "can create user records" do
+  #     # Generate a user with all default data
+  #     user = generate(user())
+  #     # Or generate more than one user, with some specific data
+  #     two_admins = generate_many(user(role: :admin), 2)
+  #   end
+  # end
+
   describe "Tunez.Music.search_artists/1-2" do
     def names(page), do: Enum.map(page.results, & &1.name)
 

@@ -35,7 +35,7 @@ defmodule Tunez.Music do
         delete :destroy
       end
     end
-  end
+  end 
 
   forms do
     form :create_album, args: [:artist_id]

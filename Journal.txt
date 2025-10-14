@@ -2359,6 +2359,15 @@ Chapter 6: Authorization: What Can You Do? (123)
                 end
 
 Chapter 7: Testing Your Application (157)
+    Before I start I wanted to update an issue that you might have had while using the pure code that I posted, While trying to access the artists page for any artists you might have had an issue that you couldn't see the page without an error, this was because I added in an extra param that shouldn't have been there within the tunez/lib/tunez_web/live/artists/show_live.ex 
+        def render(assigns) do
+            # ...
+            <.button_link navigate={~p"/artists/#{@artist.id}/albums/new"} kind="primary"
+                :if={Tunez.Music.can_create_album?(@current_user)}> # Remove @artist
+                New Album
+            </.button_link>
+    This should solve that issue.
+
     There are 2 main reasons to test your code:
         To confirm our current understanding of the code.
         To protect against untended code changes.
@@ -2398,11 +2407,160 @@ Chapter 7: Testing Your Application (157)
                     end
                 end
 
-            As we can see here we are creating an artist and then doing the search to make sure that its in the DB.
+            As we can see here we are creating an artist and then doing the search to make sure that its in the DB. Let's talk about some pros and cons for this.
+
+            "Pro: We Are Testing Real Sequences of Events"
+                If we change anything in the way that we are doing the creating or updating how a user will create this will fail, so we can see exactly how a user might see the results.
+
+            "Con: Real Application Code Has Rule and Dependencies"
+                There might be a reason to only make a test on Tuesdays (Weird but that might really be a thing) this test will fail. There are workarounds but it might not always be perfect for this. Here is some syntax that might solve that issue.
+                    create :create do
+                        argument :validate_tuesday, :boolean, default: true, public?: false
+                        validate IsTuesday, where: argument_equals(:validate_tuesday, true)
+                    end
+            
+            "Pro: Your Application is End-to-End Testable"  
+                This can be the best so long as you are able to ensure that you have the right steps enabled to work around the quirks of your current setup
+
+        Seeding Data
+            Seeds can be used to make any or a lot of user data and artists so that you can do some tests on the data created. AshPostgres can essentially perform an INSERT. There might be a error that we want to have at least 3 sentences, We can even use AshPostgres to insert things that might not hold to the current version of what we want or choice to validate. lib/tunez/mu 
+                # The validation for needing 3 sentences might look like
+                validations do
+                    validate {SentenceCount, field: :biography, min: 3} do
+                        where changing(:biography)
+                    end
+                end
+            
+            Let's write a test for this.
+                # Demonstration test only - this validation doesn't exist in Tunez!
+                describe "Tunez.Music.update_artist!/1-3" do
+                test "when an artist's name is updated, the biography length does
+                                        not cause a validation error" do
+                artist =
+                    Ash.Seed.seed!(%Tunez.Music.Artist{
+                    name: "The Froody Dudes",
+                    biography: "42 musicians all playing the same instrument (a towel)."
+                    })
+
+                updated_artist = Tunez.Music.update_artist!(artist, %{name: "New Name"})
+                assert updated_artist.name == "New Name"
+                end
+            end
+
+            "Pro: Your Tests Are Faster and Simpler"
+                This can work to set everything that you have in the exact scenario that you are trying to test. 
+
+            "Con: Your Tests Are Not as Realistic"
+                This might not be the exact way that a user will be able to interact with the db or the UI
+
+        How do I choose Between Seeds and Calling Actions?
+            When both will do what you need, consider what you’re trying to test. Are you testing a data condition, such as the validation example, or are you testing an event, such as running a search query? If the former, then use seeds. If the latter, use your resource actions. When in doubt, use actions.
 
     Consolidating Test Setup Logic
+        Ash.Generator provides tools for dynamically for generating. It is built off of the StreamData. Let's try it out with an IEX session.
+            iex -S mix
+            ex(1)> Ash.Type.generator(:integer, min: 1, max: 100)
+            #StreamData<66.1229758/2 in StreamData.integer/1>
+            iex(2)> Ash.Type.generator(:integer, min: 1, max: 100) |> Enum.take(10)
+            [21, 79, 33, 16, 15, 95, 53, 27, 69, 31]
 
+        It can even do more with maps see below.
+            iex(1)> Ash.Type.generator(:map, fields: [
+                    hello: [
+                        type: {:array, :integer},
+                        constraints: [min_length: 2, items: [min: -1000, max: 1000]]
+                    ],
+                    world: [type: :uuid]
+                ]) |> Enum.take(1)
+            [%{hello: [-98, 290], world: "2368cc8d-c5b6-46d8-97ab-1fe1d9e5178c"}]
+
+        Creating Test Data Using Ash.Generator
+            There is already set some of these set in the file tunez/test/support/generator.ex, just un comment the lines that is already there. And then remove the raise line. Once that is done we can use that generator. Head back to the file tunez/test/tunez/music/artist_test.exs
+                # Demonstration test - this is only to show how to call generators!
+                defmodule Tunez.Accounts.UserTest do
+                    import Tunez.Generator
+
+                    test "can create user records" do
+                        # Generate a user with all default data
+                        user = generate(user())
+                        # Or generate more than one user, with some specific data
+                        two_admins = generate_many(user(role: :admin), 2)
+                    end
+                end
+
+            This way we will create a new artists for each instance of the entires there is a way to make sure that we only create a new user for each one with the once/2 helper. You would use it like this.
+                def artist(opts \\ []) do
+                    actor = opts[:actor] || once(:default_actor, fn ->
+                        generate(user(role: :admin))
+                    end)         
+                    changeset_generator(
+                        Tunez.Music.Artist,
+                        :create,
+                        defaults: [name: sequence(:artist_name, &"Artist #{&1}")],
+                        actor: actor,
+                        overrides: opts
+                    )
+                end
+
+            There is even a way to put this all together with both albums and artists, then set a seeded_artists generator.
+                def artist(opts \\ []) do
+                    actor =
+                    opts[:actor] ||
+                        once(:default_actor, fn ->
+                        generate(user(role: :admin))
+                        end)
+
+                    changeset_generator(
+                    Tunez.Music.Artist,
+                    :create,
+                    defaults: [name: sequence(:artist_name, &"Artist #{&1}")],
+                    actor: actor,
+                    overrides: opts
+                    )
+                end
+
+                def album(opts \\ []) do
+                    actor =
+                    opts[:actor] ||
+                        once(:default_actor, fn ->
+                        generate(user(role: opts[:actor_role] || :editor))
+                        end)
+
+                    artist_id =
+                    opts[:artist_id] ||
+                        once(:default_artist_id, fn ->
+                        generate(artist()).id
+                        end)
+
+                    changeset_generator(
+                    Tunez.Music.Album,
+                    :create,
+                    defaults: [
+                        name: sequence(:album_name, &"Album #{&1}"),
+                        year_released: StreamData.integer(1951..2024),
+                        artist_id: artist_id,
+                        cover_image_url: nil
+                    ],
+                    overrides: opts,
+                    actor: actor
+                    )
+                end
+
+                def seeded_artist(opts \\ []) do
+                    actor =
+                    opts[:actor] ||
+                        once(:default_actor, fn ->
+                        generate(user(role: :admin))
+                        end)
+
+                    seed_generator(
+                    %Tunez.Music.Artist{name: sequence(:artist_name, &"Artist #{&1}")},
+                    actor: actor,
+                    overrides: opts
+                    )
+                end
     Testing Resources
+        
 
     Testing Interfaces
 
