@@ -1,11 +1,23 @@
 defmodule Tunez.Music.ArtistTest do
   use Tunez.DataCase, async: true
-
+  import Tunez.Generator
   alias Tunez.Music, warn: false
 
   describe "Tunez.Music.read_artists!/0-2" do
     test "when there is no data, nothing is returned" do
       assert Music.read_artists!() == []
+    end
+  end
+
+  describe "Music.can_create_artist?/1" do
+    test "only admins can create artists" do
+      admin = generate(user(role: :admin))
+      assert Music.can_create_artist?(admin)
+      editor = generate(user(role: :editor))
+      refute Music.can_create_artist?(editor)
+      user = generate(user())
+      refute Music.can_create_artist?(user)
+      refute Music.can_create_artist?(nil)
     end
   end
 
@@ -36,6 +48,31 @@ defmodule Tunez.Music.ArtistTest do
 
       updated_artist = Tunez.Music.update_artist!(artist, %{name: "New Name"})
       assert updated_artist.name == "New Name"
+    end
+  end
+
+  describe "Tunez.Music.search_artists/1-2" do
+    defp names(page), do: Enum.map(page.results, & &1.name)
+
+    test "can filter by partial name matches" do
+      ["hello", "goodbye", "what?"]
+      |> Enum.each(&generate(artist(name: &1)))
+
+      assert Enum.sort(names(Music.search_artists!("o"))) == ["goodbye", "hello"]
+      assert names(Music.search_artists!("oo")) == ["goodbye"]
+      assert names(Music.search_artists!("he")) == ["hello"]
+    end
+
+    test "can sort by number of album releases" do
+      generate(artist(name: "two", album_count: 2))
+      generate(artist(name: "none"))
+      generate(artist(name: "one", album_count: 1))
+      generate(artist(name: "three", album_count: 3))
+
+      actual =
+        names(Music.search_artists!("", query: [sort_input: "-album_count"]))
+
+      assert actual == ["three", "two", "one", "none"]
     end
   end
 

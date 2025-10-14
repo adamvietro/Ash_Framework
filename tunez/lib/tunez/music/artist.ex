@@ -94,11 +94,12 @@ defmodule Tunez.Music.Artist do
     belongs_to(:updated_by, Tunez.Accounts.User)
   end
 
-  # calculations do
-  #   calculate(:album_count, :integer, expr(count(albums)))
-  #   calculate(:latest_album_year_released, :integer, expr(first(albums, field: :year_released)))
-  #   calculate(:cover_image_url, :string, expr(first(albums, field: :cover_image_url)))
-  # end
+  calculations do
+    calculate(:name_length, :integer, expr(string_length(name)))
+    #   calculate(:album_count, :integer, expr(count(albums)))
+    #   calculate(:latest_album_year_released, :integer, expr(first(albums, field: :year_released)))
+    #   calculate(:cover_image_url, :string, expr(first(albums, field: :cover_image_url)))
+  end
 
   aggregates do
     # calculate :album_count, :integer, expr(count(albums))

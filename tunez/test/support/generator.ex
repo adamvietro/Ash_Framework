@@ -197,6 +197,20 @@ defmodule Tunez.Generator do
     )
   end
 
+  def seeded_artist(opts \\ []) do
+    actor =
+      opts[:actor] ||
+        once(:default_actor, fn ->
+          generate(user(role: :admin))
+        end)
+
+    seed_generator(
+      %Tunez.Music.Artist{name: sequence(:artist_name, &"Artist #{&1}")},
+      actor: actor,
+      overrides: opts
+    )
+  end
+
   def duration do
     StreamData.repeatedly(fn ->
       "#{Enum.random(1..20)}:#{Enum.random(0..5)}#{Enum.random(0..9)}"

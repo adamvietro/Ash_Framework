@@ -5,6 +5,28 @@ defmodule TunezWeb.Music.AlbumTest do
   alias Tunez.Music, warn: false
 
   describe "Tunez.Music.create_album/1-2" do
+    test "year_released must be between 1950 and next year" do
+      admin = generate(user(role: :admin))
+      artist = generate(artist())
+      # The assertion isn't really needed here, but we want to signal to
+      # our future selves that this is part of the test, not the setup.
+      assert %{artist_id: artist.id, name: "test 2024", year_released: 2024}
+             |> Music.create_album!(actor: admin)
+
+      # Using `assert_raise`
+      assert_raise Ash.Error.Invalid, ~r/must be between 1950 and next year/, fn ->
+        %{artist_id: artist.id, name: "test 1925", year_released: 1925}
+        |> Music.create_album!(actor: admin)
+      end
+
+      # Using `assert_has_error` - note the lack of bang to return the error
+      %{artist_id: artist.id, name: "test 1950", year_released: 1950}
+      |> Music.create_album(actor: admin)
+      |> Ash.Test.assert_has_error(Ash.Error.Invalid, fn error ->
+        match?(%{message: "must be between 1950 and next year"}, error)
+      end)
+    end
+
     @tag :skip
     test "stores the actor that created the record" do
       # actor = generate(user(role: :admin))

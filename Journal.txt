@@ -2502,7 +2502,7 @@ Chapter 7: Testing Your Application (157)
                     )
                 end
 
-            There is even a way to put this all together with both albums and artists, then set a seeded_artists generator.
+            There is even a way to put this all together with both albums and artists, there is also a way to seed the data with seed_generator seeded_artists generator.
                 def artist(opts \\ []) do
                     actor =
                     opts[:actor] ||
@@ -2546,6 +2546,7 @@ Chapter 7: Testing Your Application (157)
                     )
                 end
 
+                # This is for when you want to seed the data not just 
                 def seeded_artist(opts \\ []) do
                     actor =
                     opts[:actor] ||
@@ -2560,9 +2561,191 @@ Chapter 7: Testing Your Application (157)
                     )
                 end
     Testing Resources
+        Testing Actions
+            The tests should follow a few guidelines:
+                Prefer to use code interfaces when calling actions
+                Use the raising "bang" versions of code
+                Avoid Pattern matching to assert the success of failure
+                For asserting errors, use Ash.Test.assert_has_error or assert_false
+                Test policies, calculations, aggregates, and relationships separately
+
+            Lets set some more test that will work with the search functions.
+                describe "Tunez.Music.search_artists/1-2" do
+                    defp names(page), do: Enum.map(page.results, & &1.name)
+
+                    test "can filter by partial name matches" do
+                        ["hello", "goodbye", "what?"]
+                        |> Enum.each(&generate(artist(name: &1)))
+
+                        assert Enum.sort(names(Music.search_artists!("o"))) == ["goodbye", "hello"]
+                        assert names(Music.search_artists!("oo")) == ["goodbye"]
+                        assert names(Music.search_artists!("he")) == ["hello"]
+                    end
+
+                    test "can sort by number of album releases" do
+                        generate(artist(name: "two", album_count: 2))
+                        generate(artist(name: "none"))
+                        generate(artist(name: "one", album_count: 1))
+                        generate(artist(name: "three", album_count: 3))
+
+                        actual =
+                            names(Music.search_artists!("", query: [sort_input: "-album_count"]))
+
+                        assert actual == ["three", "two", "one", "none"]
+                    end
+                end
+
+        Testing Errors
+            tunez/test/tunez/music/album_test.exs
+                describe "Tunez.Music.create_album/1-2" do
+                    test "year_released must be between 1950 and next year" do
+                    admin = generate(user(role: :admin))
+                    artist = generate(artist())
+                    # The assertion isn't really needed here, but we want to signal to
+                    # our future selves that this is part of the test, not the setup.
+                    assert %{artist_id: artist.id, name: "test 2024", year_released: 2024}
+                            |> Music.create_album!(actor: admin)
+
+                    # Using `assert_raise`
+                    assert_raise Ash.Error.Invalid, ~r/must be between 1950 and next year/, fn ->
+                        %{artist_id: artist.id, name: "test 1925", year_released: 1925}
+                        |> Music.create_album!(actor: admin)
+                    end
+
+                    # Using `assert_has_error` - note the lack of bang to return the error
+                    %{artist_id: artist.id, name: "test 1950", year_released: 1950}
+                    |> Music.create_album(actor: admin)
+                    |> Ash.Test.assert_has_error(Ash.Error.Invalid, fn error ->
+                        match?(%{message: "must be between 1950 and next year"}, error)
+                    end)
+                end
         
+        Testing Policies
+            There is a way to test even policies, the Ash.can? is the way again. tunez/test/tunez/music/artist_test.exs
+                describe "Music.can_create_artist?/1" do
+                    test "only admins can create artists" do
+                    admin = generate(user(role: :admin))
+                    assert Music.can_create_artist?(admin)
+                    editor = generate(user(role: :editor))
+                    refute Music.can_create_artist?(editor)
+                    user = generate(user())
+                    refute Music.can_create_artist?(user)
+                    refute Music.can_create_artist?(nil)
+                end
+            end
+
+            Lets say that you want to add a new requirement that a user should be able to look up their own records and that admins should be able to look up any record. 
+                policy action(:get_by_email) do
+                    authorize_if expr(id == ^actor(:id))
+                    authorize_if actor_attribute_equals(:role, :admin)
+                end
+
+            Now we can test this functionality.
+                # Demonstration tests only - this functionality doesn't exist in Tunez!
+                test "users can only read themselves" do
+                    [actor, other] = generate_many(user(), 2)
+                    # this assertion would fail, because the actor *can* run the action
+                    # but it *wouldn't* return the other user record
+                    # refute Accounts.can_get_user_by_email?(actor, other.email)
+                    assert Accounts.can_get_user_by_email?(actor, actor.email, data: actor)
+                    refute Accounts.can_get_user_by_email?(actor, other.email, data: other)
+                end
+
+                test "admins can read all users" do
+                    [user1, user2] = generate_many(user(), 2)
+                    admin = generate(user(role: :admin))
+                    assert Accounts.can_get_user_by_email?(admin, user1.email, data: user1)
+                    assert Accounts.can_get_user_by_email?(admin, user2.email, data: user2)
+                end
+
+            Testing Relationships and Aggregates
+                There is nothing that is needed to test Relationships or aggregates as they can just be done at any time. The thing that we can do right now is show the way you can use authorize?: false to skip the authorization. That way you can test what you want after you have tested the polices, again one at a time.
+                    # Demonstration test only - this functionality doesn't exist in Tunez
+                    test "users cannot see who created an album" do
+                        user = generate(user())
+                        album = generate(album())
+                        # We *can* load the user record if we skip authorization
+                        assert Ash.load!(album, :created_by, authorize?: false).created_by
+                        # If this assertion fails, we know that it must be due to authorization
+                        assert Ash.load!(album, :created_by, actor: user).created_by
+                    end
+            
+            Testing Calculations
+                One thing to test is the aggregates that we created so for this one we will add in a temp calculation head to tunez/lib/tunez/music/artists.ex
+                    calculations do
+                        calculate :name_length, :integer, expr(string_length(name))
+                    end
+
+                Then we can test it in an iex session. 
+                    iex(1)> artist = %Tunez.Music.Artist{name: "Amazing!"} |>
+                                    Ash.load!(:name_length)
+                    #Tunez.Music.Artist<...>
+                    iex(2)> artist.name_length
+                    8
+                    iex(30)> Ash.calculate!(Tunez.Music.Artist, :name_length,
+                                    refs: %{name: "Amazing!"})
+                    8
+
+                We can then even use this for calculations that require the database. We can rewrite that same function using the PostgreSQL's length function:
+                    calculations do
+                        calculate :name_length, :integer, expr(fragment("length(?)", name))
+                    end
+
+                Then we can call it in an iex session:
+                    iex(3)> Ash.calculate!(Tunez.Music.Artist, :name_length,
+                                        refs: %{name: "Amazing!"})
+                    SELECT (length($1))::bigint FROM (VALUES(1)) AS f0 ["Amazing!"]
+                    8
+
+                We can also define a code interface with define_calculation, They take in a tuple and then can use the syntax to call them later. lib/tunez/music.ex
+                    resource Tunez.Music.Artist do
+                        ...
+                        define_calculation :artist_name_length, calculation: :name_length,
+                        args: [{:ref, :name}]
+                    end
+
+                Then we can test with
+                    # Demonstration test only - this function doesn't exist in Tunez!
+                    test "name_length shows how many characters are in the name" do
+                        assert Tunez.Music.artist_name_length!("fred") == 4
+                        assert Tunez.Music.artist_name_length!("wat") == 3
+                    end
+                
+            Unit Testing Changesets, Queries, and Other Ash Modules
+                # Demonstration test only - this is covered by action tests in Tunez
+                test "year_released must be greater than 1950" do
+                    Album
+                    |> Ash.Changeset.for_create(:create, %{year_released: 1920})
+                    |> assert_has_error(fn error ->
+                        match?(%{message: "must be between 1950 and" <> _}, error)
+                    end)
+                end
+
+                # Demonstration test only - this is covered by action tests in Tunez
+                # This won't work for logic in hook functions - only code in a change body
+                test "previous_names store the current name when changing to a new name" do
+                    changeset =
+                        %Artist{name: "george", previous_names: ["fred"]}
+                        |> Ash.Changeset.new()
+                        # `opts` and `context` aren't used by this change, so we can
+                        # leave them empty
+                        |> Tunez.Music.Changes.UpdatePreviousNames.change([], %{})
+
+                    assert Ash.Changeset.changing_attribute?(changeset, :previous_names)
+                    assert {:ok, ["george", "fred"]} = Ash.Changeset.fetch_change(changeset,
+                        :previous_names)
+
+            Should I Actually Unit Test Every Single One of These Things?
+                Variations needs there own test and anything that you want to be sure that you want to make sure will always work you should test.
 
     Testing Interfaces
+        Everything so far has been about resources or actions, but there will be needs to test the interface. So that you know that a user will have the same experience.
+
+        Testing GraphQL
+
+        Testing AshJsonApi
+
+        Testing Phoenix LiveView
 
 Chapter 8: Having Fun With Nested Forms (179)
     Setting Up a Track Resource
