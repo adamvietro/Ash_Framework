@@ -2808,6 +2808,28 @@ Chapter 8: Having Fun With Nested Forms (179)
                     end
                 end
             end
+        
+        Order will be and integer that will be 1 to the last track number that will help to order the tracks. We now need to head to the album domain to set-up the relationship lib/tunez/music/album.ex
+            relationships do
+                # ...
+
+                has_many :tracks, Tunez.Music.Track do
+                    sort(order: :asc)
+                end
+            end
+        
+        As we can see again there is some ASH functionality that can be sure to order the tracks in the right way. Last thing before the codegen and migration we want to add in the relation to the artist as well. lib/tunez/music/track.ex
+            postgres do
+                # ...
+
+                references do
+                    reference(:album, index?: true, on_delete: :delete)
+                end
+            end
+
+        Let's start the codegen and then migrate
+            mix ash.codegen add_album_tracks
+            mix ash.migrate
     
     Managing Relationships for Related Resources
 

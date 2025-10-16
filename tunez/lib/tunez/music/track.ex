@@ -4,6 +4,10 @@ defmodule Tunez.Music.Track do
   postgres do
     table("tracks")
     repo(Tunez.Repo)
+
+    references do
+      reference(:album, index?: true, on_delete: :delete)
+    end
   end
 
   attributes do
