@@ -2830,8 +2830,147 @@ Chapter 8: Having Fun With Nested Forms (179)
         Let's start the codegen and then migrate
             mix ash.codegen add_album_tracks
             mix ash.migrate
+
+        Reading and Writing Track Data
+            We want to be able to add and delete tracks with a form here, but we also want it to be part of the album form as well. Let's start out with the actions that we will need. lib/tunez/music/track.ex
+                actions do
+                    defaults([:read, :destroy])
+
+                    create :create do
+                        primary?(true)
+                        accept([:order, :name, :duration_seconds, :album_id])
+                    end
+
+                    update :update do
+                        primary?(true)
+                        accept([:order, :name, :duration_seconds])
+                    end
+                end
     
     Managing Relationships for Related Resources
+        Let's now head to the form for albums and add in a form for the album. lib/tunez_web/albums/form_live.ex
+            <.input field={form[:cover_image_url]} label="Cover Image URL" />
+
+            <.track_inputs form={form} />
+                
+            <:actions>
+
+        That is not all we need we have a error when we try to create a new album. This is the error message that we got.
+            tracks at path [] must be configured in the form to be used with `inputs_for`. For example:
+
+            There is a relationship called `tracks` on the resource `Tunez.Music.Album`.
+
+            Perhaps you are missing an argument with `change manage_relationship` in the action Tunez.Music.Album.create?
+
+        Managing Relationships with... err... manage_relationship
+            This might be the most important part of Ash. Trying to deal with  relationship data in action will probably be using this function. This will be put into the action block of the resource. 
+
+            "Using Type append_and_remove"
+                append_and_remove is a way of saying "replace the existing links in the relationship with these new links, adding and removing records where necessary." Lets say that we wanted to add in the artist id to the album that we are creating we could do something like.
+                    create :create do
+                        accept [:name, :year_released, :cover_image_url]
+                        argument :artist_id, :uuid, allow_nil?: false
+                        change manage_relationship(:artist_id, :artist, type: :append_and_remove)
+                    end
+
+        Using Type direct_control
+            direct_control will help us to not only unlink but delete the entry. Let's combine the 2 and then make sure that we are doing everything that we want when we are creating a new album. lib/tunez/music/album.ex
+                create :create do
+                        accept([:name, :year_released, :cover_image_url, :artist_id])
+                        argument(:tracks, {:array, :map})
+                        change(manage_relationship(:tracks, type: :direct_control))
+                    end
+
+                    update :update do
+                        accept([:name, :year_released, :cover_image_url])
+                        require_atomic? false
+                        argument(:tracks, {:array, :map})
+                        change(manage_relationship(:tracks, type: :direct_control))
+                    end
+                end
+
+            That was it we can now create a new album with tracks and add them as we go or with a batch with the right map.
+                ex(1)> tracks = [
+                        %{order: 1, name: "Test Track 1", duration_seconds: 120},
+                        %{order: 3, name: "Test Track 3", duration_seconds: 150},
+                        %{order: 2, name: "Test Track 2", duration_seconds: 55}
+                    ]
+                [...]
+                iex(2)> Tunez.Music.create_album!(%{name: "Test Album", artist_id: «uuid»,
+                year_released: 2025, tracks: tracks}, authorize?: false)
+                «SQL queries to create the album and each of the tracks»
+                #Tunez.Music.Album<
+                    tracks: [
+                        #Tunez.Music.Track<order: 1, ...>
+                        #Tunez.Music.Track<order: 2, ...>,
+                        #Tunez.Music.Track<order: 3, ...>
+                    ],
+                    name: "Test Album", ...
+                >
+
+            Now that that is done we need to be able to load the track data in the form to make sure that we have the ones already as well as show the ones we are adding. head to lib/tunez_web/live/album/form_live.ex
+                def mount(%{"id" => album_id}, _session, socket) do
+                    album =
+                    Tunez.Music.get_album_by_id!(album_id,
+                        load: [:artist, :tracks],
+                        actor: socket.assigns.current_user
+                    )
+
+        Adding and Removing Tracks via the Form
+            Ash created all the buttons we need to add and remove the tracks but the buttons don't do anything but try to trigger the event "add-track" or "remove-track" let's implement those now.
+
+            "Adding New Rows for Track Data"
+                AshPhoenix.form has some functionality for this in the form of add_form and remove_form. Staying in the same file but heading to the handle_event("add_track")
+                    def handle_event("add-track", _params, socket) do
+                        socket =
+                        update(socket, :form, fn form ->
+                            AshPhoenix.Form.add_form(form, :tracks)
+                        end)
+
+                        {:noreply, socket}
+                    end
+            
+                This is the basic way to do the add tracks but if we are updating a track we would want the tracks to show up in the right order so here is the way we aer going to do it in our app.
+                    update(socket, :form, fn form ->
+                        order = length(AshPhoenix.Form.value(form[:tracks]) || []) + 1
+                        AshPhoenix.Form.add_form(form, :tracks, params: %{"order" => order})
+                    end)
+
+            "Removing Existing Rows of Track Data"
+                Now we want to deal with the "remove-track" event. If you look at the track_inputs section we can see that it again calls the "remove-track" event let's head to the handle_event for that.
+                    def handle_event("remove-track", %{"path" => path}, socket) do
+                        socket =
+                        update(socket, :form, fn form ->
+                            AshPhoenix.Form.remove_form(form, path)
+                        end)
+
+                        {:noreply, socket}
+                    end
+
+        What About Polices?
+            Right now we are still secure as any form is still related to the form that called it. So you cant create a album without the right perms, but we might want to add in other policies going forward. Let's head to the track resource and add some policies now. lib/tunez/music/track.ex
+                defmodule Tunez.Music.Track do
+                    use Ash.Resource,
+                        otp_app: :tunez,
+                        domain: Tunez.Music,
+                        data_layer: AshPostgres.DataLayer,
+                        authorizers: [Ash.Policy.Authorizer]
+
+                    polices do
+                        policy always() do
+                        authorize_if(accessing_from(Tunez.Music.Album, :tracks))
+                        end
+                    end
+
+            This can be read as if tracks are being (action) through the :tracks relationship through Album you are fine. This created a lot of way to access the tracks but one that is missing is the fetching a track by its ID. That as that is just using the track data not through anything else. Let's add that now. lib/tunez/music/track.ex
+                polices do
+                    policy always() do
+                        authorize_if(accessing_from(Tunez.Music.Album, :tracks))
+                        authorize_if(action_type(:read))
+                    end
+                end
+
+            Is that simple we now have a way to access the data without needing to go through the right channels.
 
     Reorder All of the Tracks!!!
 

@@ -10,6 +10,7 @@
         "ILIKE",
         "nowrap",
         "Nullarbor",
+        "numericality",
         "Postgrex",
         "Profilin",
         "psql",
