@@ -2759,8 +2759,55 @@ Chapter 7: Testing Your Application (157)
 
         sudo nano /etc/postgresql/17/main/pg_hba.conf
 
+        Okay so just so its here I changed some things in this file so md5 so that it asks me for a password in order to use psql, that made it possible to test more things but it wasn't the issue.
+
+        The issue was the line in my pg_trgm migration. It was with " and - not _ once I fixed that I was able to get it to work every time here is the final line.
+            def up do
+                execute("CREATE EXTENSION IF NOT EXISTS pg_trgm")
+            end
+
 Chapter 8: Having Fun With Nested Forms (179)
     Setting Up a Track Resource
+        Now we can setup a new resource so we can have tracks for the albums. We want to have the following for this new resource:
+            Order of the tracks
+            Name of the track
+            Duration of the track
+            What album the tracks belong to
+            (Id and timestamp for records)
+        
+        The standard console command is going to be used here.
+            mix ash.gen.resource Tunez.Music.Track --extend postgres
+
+        Once that is done we can head to lib/tunez/music/track.ex and add in the new resource attributes.
+            defmodule Tunez.Music.Track do
+                # ...
+
+                attributes do
+                    uuid_primary_key(:id)
+
+                    attribute :order, :integer do
+                    allow_nil?(false)
+                    end
+
+                    attribute :name, :string do
+                    allow_nil?(false)
+                    end
+
+                    attribute :duration_seconds, :integer do
+                    allow_nil?(false)
+                    constraints(min: 1)
+                    end
+
+                    create_timestamp(:inserted_at)
+                    update_timestamp(:updated_at)
+                end
+
+                relationships do
+                    belongs_to :album, Tunez.Music.Album do
+                    allow_nil?(false)
+                    end
+                end
+            end
     
     Managing Relationships for Related Resources
 
