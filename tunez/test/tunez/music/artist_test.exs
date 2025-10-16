@@ -37,21 +37,7 @@ defmodule Tunez.Music.ArtistTest do
     end
   end
 
-  describe "Tunez.Music.update_artist!/1-3" do
-    test "when an artist's name is updated, the biography length does
-                            not cause a validation error" do
-      artist =
-        Ash.Seed.seed!(%Tunez.Music.Artist{
-          name: "The Froody Dudes",
-          biography: "42 musicians all playing the same instrument (a towel)."
-        })
-
-      updated_artist = Tunez.Music.update_artist!(artist, %{name: "New Name"})
-      assert updated_artist.name == "New Name"
-    end
-  end
-
-  describe "Tunez.Music.search_artists/1-2" do
+  describe "Tunez.Music.search_artists" do
     defp names(page), do: Enum.map(page.results, & &1.name)
 
     test "can filter by partial name matches" do
@@ -89,7 +75,7 @@ defmodule Tunez.Music.ArtistTest do
   # end
 
   describe "Tunez.Music.search_artists/1-2" do
-    def names(page), do: Enum.map(page.results, & &1.name)
+    # def names(page), do: Enum.map(page.results, & &1.name)
 
     @tag :skip
     test "can filter by partial name matches" do

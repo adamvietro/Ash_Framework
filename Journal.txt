@@ -2757,6 +2757,8 @@ Chapter 7: Testing Your Application (157)
 
         Want to figure out why this is not working need to test this for the tunez_test db.
 
+        sudo nano /etc/postgresql/17/main/pg_hba.conf
+
 Chapter 8: Having Fun With Nested Forms (179)
     Setting Up a Track Resource
     

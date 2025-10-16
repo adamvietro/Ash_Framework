@@ -10,7 +10,7 @@ defmodule Tunez.Repo.Migrations.AddGinIndexForArtistNameSearchExtensions1 do
   @disable_ddl_transaction true
 
   def up do
-    execute("CREATE EXTENSION IF NOT EXISTS \"pg-trgm\"")
+    execute("CREATE EXTENSION IF NOT EXISTS pg_trgm")
   end
 
   def down do
