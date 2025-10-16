@@ -163,7 +163,7 @@ defmodule TunezWeb.Albums.FormLive do
   def handle_event("add-track", _params, socket) do
     socket =
       update(socket, :form, fn form ->
-        order = length(AshPhoenix.Form.value(form[:tracks]) || []) + 1
+        order = length(AshPhoenix.Form.value(form, :tracks) || []) + 1
         AshPhoenix.Form.add_form(form, :tracks, params: %{"order" => order})
       end)
 

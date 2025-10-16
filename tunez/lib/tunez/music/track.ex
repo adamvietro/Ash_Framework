@@ -5,7 +5,7 @@ defmodule Tunez.Music.Track do
     data_layer: AshPostgres.DataLayer,
     authorizers: [Ash.Policy.Authorizer]
 
-  polices do
+  policies do
     policy always() do
       authorize_if(accessing_from(Tunez.Music.Album, :tracks))
       authorize_if(action_type(:read))
