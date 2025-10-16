@@ -7,6 +7,8 @@ defmodule Tunez.Repo.Migrations.AddGinIndexForArtistNameSearchExtensions1 do
 
   use Ecto.Migration
 
+  @disable_ddl_transaction true
+
   def up do
     execute("CREATE EXTENSION IF NOT EXISTS \"pg-trgm\"")
   end
