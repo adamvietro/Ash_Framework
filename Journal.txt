@@ -3066,8 +3066,70 @@ Chapter 8: Having Fun With Nested Forms (179)
                         end
 
     Automatic Conversions Between Seconds and Minutes
+        Let's make sure that the track duration is no longer the amount of seconds but the minutes and seconds.
         
+        Calculating the Minutes and Seconds of a Track
+            Okay so for this we are going to use some calculations but in order to do this we can then create our own module that will deal with the conversion. lib/tunez/music/calculations/seconds_to_minutes.ex
+                defmodule Tunez.Music.Calculations.SecondsToMinutes do
+                    use Ash.Resource.Calculation
+                    @impl true
+                    def calculate(tracks, _opts, _context) do
+                        Enum.map(tracks, fn %{duration_seconds: duration} ->
+                        seconds =
+                            rem(duration, 60)
+                            |> Integer.to_string()
+                            |> String.pad_leading(2, "0")
 
+                        "#{div(duration, 60)}:#{seconds}"
+                        end)
+                    end
+                end
+
+            With that done let's leverage that to make a calculation to covert the data. lib/tunez/music/track/ex
+                calculations do
+                    calculate :number, :integer, expr(order + 1)
+                    calculate :duration, :string, Tunez.Music.Calculations.SecondsToMinutes
+                end
+
+            "Two Implementations for Every Calculation"
+                Any calculation can be run either in the database or in code (second). 
+                    iex(1)> Tunez.Music.get_album_by_id!(«uuid», load: [:description])
+                    SELECT a0."id", «the other album fields», (a0."name"::text || ($1 ||
+                    a0."year_released"::bigint))::text FROM "albums" AS a0 WHERE (a0."id"::uuid
+                    = $2::uuid) [" :: ", «uuid»]
+                    %Tunez.Music.Album{description: "Chronicles :: 2022", ...}
+
+                In Memory
+                    iex(2)> album = Tunez.Music.get_album_by_id!(«uuid»)
+                    SELECT a0."id", a0."name", a0."cover_image_url", a0."created_by_id", ...
+                    %Tunez.Music.Album{description: #Ash.NotLoaded<...>, ...}
+                    iex(3)> Ash.load!(album, :description, reuse_values?: true)
+                    %Tunez.Music.Album{description: "Chronicles :: 2022", ...}
+
+                For our data we want to use the database to do this with an expression. That way the database can do that for us. Head back to lib/tunez/music/calculations/seconds_to_minutes.ex
+                    defmodule Tunez.Music.Calculations.SecondsToMinutes do
+                        use Ash.Resource.Calculation
+
+                        @impl true
+                        def expression(_opts, _context) do
+                            expr(
+                            fragment("? / 60 || to_char(? * interval '1s', ':SS')", duration_seconds, duration_seconds)
+                            )
+                        end
+                    end
+
+                Let's test this in iex
+                    iex(7)> Ash.get!(Tunez.Music.Track, «uuid», load: [:duration])
+                    SELECT t0."id", t0."name", t0."order", t0."inserted_at", t0."updated_at",
+                    t0."duration_seconds", t0."album_id", (t0."order"::bigint + $1::bigint)
+                    ::bigint, (t0."duration_seconds"::bigint / 60 || to_char(t0."duration_seconds"
+                    ::bigint * interval '1s', ':SS'))::text FROM "tracks" AS t0 WHERE
+                    (t0."id"::uuid = $2::uuid) LIMIT $3 [1, «uuid», 2]
+                    #Tunez.Music.Track<duration: "5:04", duration_seconds: 304, ...>
+
+        Updating the Track List with Formatted Durations
+            Now that we have the ability to format and the durations we can now leverage Aggregates to total the album duration and then use the new calculation to show the track length as well. Start at lib/tunez/music/album.ex
+                
     Adding Track Data to API Responses
 
 Chapter 9: Following Your Favorite Artists (207)
