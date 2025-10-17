@@ -6,7 +6,7 @@ defmodule Tunez.Music.Track do
     authorizers: [Ash.Policy.Authorizer]
 
   preparations do
-    prepare build(load: [:number])
+    prepare build(load: [:number, :duration])
   end
 
   policies do
@@ -56,12 +56,17 @@ defmodule Tunez.Music.Track do
 
     create :create do
       primary?(true)
-      accept([:order, :name, :duration_seconds, :album_id])
+      accept([:order, :name, :album_id])
+      argument(:duration, :string, allow_nil?: false)
+      change(Tunez.Music.Changes.MinutesToSeconds, only_when_valid?: true)
     end
 
     update :update do
       primary?(true)
-      accept([:order, :name, :duration_seconds])
+      accept([:order, :name])
+      require_atomic? false
+      argument(:duration, :string, allow_nil?: false)
+      change(Tunez.Music.Changes.MinutesToSeconds, only_when_valid?: true)
     end
   end
 

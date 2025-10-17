@@ -3129,7 +3129,133 @@ Chapter 8: Having Fun With Nested Forms (179)
 
         Updating the Track List with Formatted Durations
             Now that we have the ability to format and the durations we can now leverage Aggregates to total the album duration and then use the new calculation to show the track length as well. Start at lib/tunez/music/album.ex
-                
+                calculations do
+                    # ...
+
+                    calculate :duration, :string, Tunez.Music.Calculations.SecondsToMinutes
+                end
+
+                aggregates do
+                    sum :duration_seconds, :tracks, :duration_seconds
+                end
+
+            Now head to lib/tunez/music/track.ex
+                preparations do
+                    prepare build(load: [:number, :duration])
+                end
+
+            Now let's head to lib/tunez_web/live/artists/show_live.ex
+                def handle_params(%{"id" => artist_id}, _url, socket) do
+                    artist =
+                    Tunez.Music.get_artist_by_id!(artist_id,
+                        load: [albums: [:duration, :tracks]],
+                        actor: socket.assigns.current_user
+                    )
+
+                <.h2>
+                    {@album.name} ({@album.year_released})
+                    <span :if={@album.duration} class="text-base"> ({@album.duration})</span>
+                </.h2>
+
+                <tr :for={track <- @tracks} class="border-t first:border-0 border-gray-100">
+                    <th class="whitespace-nowrap w-1 p-3">
+                        {String.pad_leading("#{track.number}", 2, "0")}.
+                    </th>
+                    <td class="p-3">{track.name}</td>
+                    <td class="whitespace-nowrap w-1 text-right p-2">{track.duration}</td>
+                </tr>
+
+            Now it looks great but now we want to be able to let our users enter in human readable values into the track info.
+
+        Calculating the Seconds of a Track
+            Right now we can only accept the track length as seconds but we want to be able to enter in the minutes:seconds format and then turn it into seconds. lib/tunes/music/track.ex
+                actions do
+                    defaults([:read, :destroy])
+
+                    create :create do
+                        primary?(true)
+                        accept([:order, :name, :album_id])
+                        argument(:duration, :string, allow_nil?: false)
+                        change(Tunez.Music.Calculations.MinutesToSeconds, only_when_valid?: true)
+                    end
+
+                    update :update do
+                        primary?(true)
+                        accept([:order, :name])
+                        require_atomic? false
+                        argument(:duration, :string, allow_nil?: false)
+                        change(Tunez.Music.Calculations.MinutesToSeconds, only_when_valid?: true)
+                    end
+                end
+
+            Okay now that we have this we need to create that module. lib/tunez/music/changes/  minutes_to_seconds.ex
+                defmodule Tunez.Music.Changes.MinutesToSeconds do
+                    use Ash.Resource.Change
+                    @impl true
+                    def change(changeset, _opts, _context) do
+                        {:ok, duration} = Ash.Changeset.fetch_argument(changeset, :duration)
+
+                        with :ok <- ensure_valid_format(duration),
+                            :ok <- ensure_valid_value(duration) do
+                        changeset
+                        |> Ash.Changeset.change_attribute(:duration_seconds, to_seconds(duration))
+                        else
+                        {:error, :format} ->
+                            Ash.Changeset.add_error(changeset,
+                            field: :duration,
+                            message: "use MM:SS format"
+                            )
+
+                        {:error, :value} ->
+                            Ash.Changeset.add_error(changeset,
+                            field: :duration,
+                            message: "must be at least 1 second long"
+                            )
+                        end
+                    end
+
+                    defp ensure_valid_format(duration) do
+                        if String.match?(duration, ~r/^\d+:\d{2}$/) do
+                        :ok
+                        else
+                        {:error, :format}
+                        end
+                    end
+
+                    defp ensure_valid_value(v) when v in ["0:00", "00:00"], do: {:error, :value}
+                    defp ensure_valid_value(_value), do: :ok
+
+                    defp to_seconds(duration) do
+                        [minutes, seconds] = String.split(duration, ":", parts: 2)
+                        String.to_integer(minutes) * 60 + String.to_integer(seconds)
+                    end
+                end
+
+            We can test it in iex
+                ex(4)> Tunez.Music.Track
+                Tunez.Music.Track
+                iex(5)> |> Ash.Changeset.for_create(:create, %{duration: "02:12"})
+                #Ash.Changeset<
+                attributes: %{duration_seconds: 132},
+                arguments: %{duration: "02:12"},
+                ...
+
+            Now let's leverage that new way of doing things lib/tunez_web/live/form_live.ex
+                <tr data-id={track_form.index}>
+                    <td class="px-3 w-20">
+                        <span class="hero-bars-3 handle cursor-pointer" />
+                    </td>
+                    <td class="px-3">
+                        <label for={track_form[:name].id} class="hidden">Name</label>
+                        <.input field={track_form[:name]} />
+                    </td>
+                    <td class="px-3 w-36">
+                        <label for={track_form[:duration].id} class="hidden">Duration</label>
+                        <.input field={track_form[:duration]} />
+                    </td>
+
+        Wow we are done with that now.
+            
     Adding Track Data to API Responses
 
 Chapter 9: Following Your Favorite Artists (207)

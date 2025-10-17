@@ -102,6 +102,12 @@ defmodule Tunez.Music.Album do
       :string,
       expr("wow, this was released " <> years_ago <> " years ago!")
     )
+
+    calculate :duration, :string, Tunez.Music.Calculations.SecondsToMinutes
+  end
+
+  aggregates do
+    sum :duration_seconds, :tracks, :duration_seconds
   end
 
   def next_year, do: Date.utc_today().year + 1
