@@ -3012,7 +3012,38 @@ Chapter 8: Having Fun With Nested Forms (179)
 
         Ordering Numbering, What's the Difference?
             First off lets add in a calculation that will give us the order in a way that people understand (not starting at 0) lib/tunez/music/track.ex
-                
+                calculations do
+                    calculate :number, :integer, expr(order + 1)
+                end
+
+            Now that we have the calculation we want to always load this whenever we look at the track information. To do that we need to add in a preparation.
+                preparations do
+                    prepare build(load: [:number])
+                end
+
+            Now let's leverage that to output the right info in the page. lib/tunez_web/live/artists/show_live.ex
+                <tr :for={track <- @tracks} class="border-t first:border-0 border-gray-100">
+                    <th class="whitespace-nowrap w-1 p-3">
+                        {String.pad_leading("#{track.number}", 2, "0")}.
+                    </th>
+
+            Okay so we are all set on that front now we can seed some tracks in the world.
+                mix run priv/repo/seeds/08-tracks.exs
+
+            That will run just the tracks but we can also add in the tracks to the mix seed command but uncommenting the lines the the mix.exs
+                defp aliases do
+                    [
+                        setup: ["deps.get", "ash.setup", "assets.setup", "assets.build", "run priv/repo/seeds.exs"],
+                        "ecto.setup": ["ecto.create", "ecto.migrate"],
+                        seed: [
+                            "run priv/repo/seeds/01-artists.exs",
+                            "run priv/repo/seeds/02-albums.exs",
+                            "run priv/repo/seeds/08-tracks.exs"
+                        ],
+                    ]
+
+        Drag n' Drop Sorting Goodness
+            
 
     Automatic Conversions Between Seconds and Minutes
 

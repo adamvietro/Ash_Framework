@@ -5,6 +5,10 @@ defmodule Tunez.Music.Track do
     data_layer: AshPostgres.DataLayer,
     authorizers: [Ash.Policy.Authorizer]
 
+  preparations do
+    prepare build(load: [:number])
+  end
+
   policies do
     policy always() do
       authorize_if(accessing_from(Tunez.Music.Album, :tracks))
@@ -59,5 +63,9 @@ defmodule Tunez.Music.Track do
       primary?(true)
       accept([:order, :name, :duration_seconds])
     end
+  end
+
+  calculations do
+    calculate :number, :integer, expr(order + 1)
   end
 end
