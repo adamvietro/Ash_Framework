@@ -3043,9 +3043,30 @@ Chapter 8: Having Fun With Nested Forms (179)
                     ]
 
         Drag n' Drop Sorting Goodness
-            
+            We want to add the ability to drag and drop the tracks to get a new order. We will do this by JSHooks
+
+                "Integrating a SortableJS Hook"
+                    We are now going to add in a draggable hooks to the order
+                        lib/tunez_web/albums/form_live.ex
+                            <tbody phx-hook="trackSort" id="trackSort">
+                                <.inputs_for :let={track_form} field={@form[:tracks]}>
+                                    <tr data-id={track_form.index}>
+                                        <td class="px-3 w-20">
+                                            <span class="hero-bars-3 handle cursor-pointer" />
+                                        </td>
+                
+                    Now that we have that we need to deal with the "reorder-tracks" event. 
+                        def handle_event("reorder-tracks", %{"order" => order}, socket) do
+                            socket =
+                            update(socket, :form, fn form ->
+                                AshPhoenix.Form.sort_forms(form, [:tracks], order)
+                            end)
+
+                            {:noreply, socket}
+                        end
 
     Automatic Conversions Between Seconds and Minutes
+        
 
     Adding Track Data to API Responses
 
