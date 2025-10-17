@@ -20,7 +20,7 @@ defmodule Tunez.Music.Artist do
 
   json_api do
     type("artist")
-    includes([:albums])
+    includes(albums: [:tracks])
   end
 
   postgres do

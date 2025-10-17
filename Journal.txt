@@ -3300,6 +3300,20 @@ Chapter 8: Having Fun With Nested Forms (179)
             end
 
         Special Treatment for the JSON API
+            Just the last thing for the JSON API we need to make sure that we include some tracks in the API. lib/tunez/music/artist.ex
+                json_api do
+                    type("artist")
+                    includes(albums: [:tracks])
+                end
+
+            lib/tunez/music/track.ex
+                json_api do
+                    type("track")
+                    default_fields([:number, :name, :duration ])
+                end
+
+    That was a lot to do in a day but we have it all done. Good Luck
+
 Chapter 9: Following Your Favorite Artists (207)
     Modelling with a Many-to-Many Relationship
 
