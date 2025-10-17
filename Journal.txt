@@ -2973,7 +2973,46 @@ Chapter 8: Having Fun With Nested Forms (179)
             Is that simple we now have a way to access the data without needing to go through the right channels.
 
     Reorder All of the Tracks!!!
+        Right now we have the place holder "Track Data Coming soon..." Let's deal with that. Head to lib/tunez_web/live/artists/show_live.ex
+            def handle_params(%{"id" => artist_id}, _url, socket) do
+                artist =
+                Tunez.Music.get_artist_by_id!(artist_id,
+                    load: [albums: [:tracks]],
+                    actor: socket.assigns.current_user
+                )
+
+                # ...
+                        </.header>
+                    <.track_details tracks={@album.tracks} />
+                </div>
+            </div>
+
+        Okay that is set but we want to make it look better.
         
+        Automatic Track Numbering
+            This is done pretty easily with some changes to the actions for the album. Still using the manage_relationship we need to add an extra param. lib/tunez/music/album.ex
+                create :create do
+                    accept([:name, :year_released, :cover_image_url, :artist_id])
+                    argument(:tracks, {:array, :map})
+                    change(manage_relationship(:tracks, type: :direct_control), order_is_key: :order)
+                end
+
+                update :update do
+                    accept([:name, :year_released, :cover_image_url])
+                    require_atomic? false
+                    argument(:tracks, {:array, :map})
+                    change(manage_relationship(:tracks, type: :direct_control), order_is_key: :order)
+                end
+
+            Then we need to remove the order from the form as we don't want them to change the order willy nilly. lib/tunez_web/live/albums/form_live.ex
+                <tr data-id={track_form.index}>
+                    <td class="px-3 w-20">
+                        <%!-- <.input field={track_form[:order]} type="number" /> --%>
+                    </td>
+
+        Ordering Numbering, What's the Difference?
+            First off lets add in a calculation that will give us the order in a way that people understand (not starting at 0) lib/tunez/music/track.ex
+                
 
     Automatic Conversions Between Seconds and Minutes
 
