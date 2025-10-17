@@ -3261,6 +3261,45 @@ Chapter 8: Having Fun With Nested Forms (179)
             mix ash.extend Tunez.Music.Track json_api
             mix ash.extend Tunez.Music.Track graphql
 
+        Now that we know that we don't want anyone to just update or add tracks without an album that is attached to it we don't need any other endpoints we just need to set some public and mark some relationships. First let's head to lib/tunez/music/album.ex
+            relationships do
+                belongs_to :artist, Tunez.Music.Artist do
+                allow_nil?(false)
+                end
+
+                belongs_to(:created_by, Tunez.Accounts.User)
+                belongs_to(:updated_by, Tunez.Accounts.User)
+
+                has_many :tracks, Tunez.Music.Track do
+                sort(order: :asc)
+                public?(true)
+                end
+            end
+
+        Now we can make the tracks public lib/tunez/music/track.ex
+            attributes do
+                uuid_primary_key(:id)
+
+                attribute :order, :integer do
+                allow_nil?(false)
+                end
+
+                attribute :name, :string do
+                allow_nil?(false)
+                public?(true)
+                end
+
+                #...
+            end
+
+            # ...
+
+            calculations do
+                calculate(:number, :integer, expr(order + 1), public?: true)
+                calculate(:duration, :string, Tunez.Music.Calculations.SecondsToMinutes, public?: true)
+            end
+
+        Special Treatment for the JSON API
 Chapter 9: Following Your Favorite Artists (207)
     Modelling with a Many-to-Many Relationship
 
