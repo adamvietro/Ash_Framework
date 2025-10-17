@@ -3176,7 +3176,7 @@ Chapter 8: Having Fun With Nested Forms (179)
                         primary?(true)
                         accept([:order, :name, :album_id])
                         argument(:duration, :string, allow_nil?: false)
-                        change(Tunez.Music.Calculations.MinutesToSeconds, only_when_valid?: true)
+                        change(Tunez.Music.Changes.MinutesToSeconds, only_when_valid?: true)
                     end
 
                     update :update do
@@ -3184,7 +3184,7 @@ Chapter 8: Having Fun With Nested Forms (179)
                         accept([:order, :name])
                         require_atomic? false
                         argument(:duration, :string, allow_nil?: false)
-                        change(Tunez.Music.Calculations.MinutesToSeconds, only_when_valid?: true)
+                        change(Tunez.Music.Changes.MinutesToSeconds, only_when_valid?: true)
                     end
                 end
 
@@ -3257,6 +3257,9 @@ Chapter 8: Having Fun With Nested Forms (179)
         Wow we are done with that now.
             
     Adding Track Data to API Responses
+        Okay so now we can start to leverage the track data to the API responses. First let's add in the extends
+            mix ash.extend Tunez.Music.Track json_api
+            mix ash.extend Tunez.Music.Track graphql
 
 Chapter 9: Following Your Favorite Artists (207)
     Modelling with a Many-to-Many Relationship
