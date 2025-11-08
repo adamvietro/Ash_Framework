@@ -3684,6 +3684,11 @@ Chapter 9: Following Your Favorite Artists (207)
                 
 Chapter 10: Delivering Real-Time Updates with PubSub (25O)
     Notifying Users About New Albums
+        Now we need to make sure that we have a way to show a user if there is new music that an artist has made. Let's get started.
+
+        Creating the Notification Resource
+            So this will be a new resource that will be the bridge between Tunez.Accounts Tunez.Music let's generate the empty resource.
+                mix ash.gen.resource Tunez.Accounts.Notification --extend postgres
 
     Running Actions in Bulk
 
