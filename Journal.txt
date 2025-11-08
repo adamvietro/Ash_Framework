@@ -3315,7 +3315,44 @@ Chapter 8: Having Fun With Nested Forms (179)
     That was a lot to do in a day but we have it all done. Good Luck
 
 Chapter 9: Following Your Favorite Artists (207)
+    Okay so now we want to start to make sure that a person can follow an artist and using many-to-many relationships to do that. I believe this will involve some pubsub as well.
+
     Modelling with a Many-to-Many Relationship
+        We can link users and users with a many-to-many relationship. A user can have many followed artists and the artist can have many ardent followers. 
+
+        We will create this with a join resource. This will sit between the two existing resource Tunez.Music.Artist and Tunez.Accounts.User. In this case we want it to follow the idea that a it will go in the Music domain and be in the direction of user -> artist.
+            mix ash.gen.resource Tunez.Music.ArtistFollower --extend postgres
+
+
+        With that done we can now head to lib/tunez/music/artist_follower.ex
+            relationships do
+                belongs_to :artist, Tunez.Music.Artist do
+                    primary_key? true
+                    allow_nil? false
+                end
+                belongs_to :follower, Tunez.Accounts.User do
+                    primary_key? true
+                    allow_nil? false
+                end
+            end
+
+        So for our setup we will not have a id for them as there will be no way a user can follow at artist twice and as such the combination of user and artist will be enough to uniquely identify the relationship. Also we not need to set up what happens when we delete an artist so that we don't try and send out Notifications to users about an artist that doesn't exist.
+            postgres do
+                table "artist_followers"
+                repo Tunez.Repo
+
+                references do
+                    reference :artist, on_delete: :delete, index?: true
+                    reference :follower, on_delete: :delete, index?: true
+                end
+            end
+
+        Nope that we have that setup we can codegen and then migrate the db.
+            mix ash.codegen create_artist_followers
+            mix ash.migrate
+
+        Creating the ArtistFollower Resource
+
 
     Who Do You Follow?
 
