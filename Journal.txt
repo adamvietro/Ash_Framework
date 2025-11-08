@@ -3320,39 +3320,83 @@ Chapter 9: Following Your Favorite Artists (207)
     Modelling with a Many-to-Many Relationship
         We can link users and users with a many-to-many relationship. A user can have many followed artists and the artist can have many ardent followers. 
 
-        We will create this with a join resource. This will sit between the two existing resource Tunez.Music.Artist and Tunez.Accounts.User. In this case we want it to follow the idea that a it will go in the Music domain and be in the direction of user -> artist.
-            mix ash.gen.resource Tunez.Music.ArtistFollower --extend postgres
-
-
-        With that done we can now head to lib/tunez/music/artist_follower.ex
-            relationships do
-                belongs_to :artist, Tunez.Music.Artist do
-                    primary_key? true
-                    allow_nil? false
-                end
-                belongs_to :follower, Tunez.Accounts.User do
-                    primary_key? true
-                    allow_nil? false
-                end
-            end
-
-        So for our setup we will not have a id for them as there will be no way a user can follow at artist twice and as such the combination of user and artist will be enough to uniquely identify the relationship. Also we not need to set up what happens when we delete an artist so that we don't try and send out Notifications to users about an artist that doesn't exist.
-            postgres do
-                table "artist_followers"
-                repo Tunez.Repo
-
-                references do
-                    reference :artist, on_delete: :delete, index?: true
-                    reference :follower, on_delete: :delete, index?: true
-                end
-            end
-
-        Nope that we have that setup we can codegen and then migrate the db.
-            mix ash.codegen create_artist_followers
-            mix ash.migrate
-
         Creating the ArtistFollower Resource
+            We will create this with a join resource. This will sit between the two existing resource Tunez.Music.Artist and Tunez.Accounts.User. In this case we want it to follow the idea that a it will go in the Music domain and be in the direction of user -> artist.
+                    mix ash.gen.resource Tunez.Music.ArtistFollower --extend postgres
 
+
+                With that done we can now head to lib/tunez/music/artist_follower.ex
+                    relationships do
+                        belongs_to :artist, Tunez.Music.Artist do
+                            primary_key? true
+                            allow_nil? false
+                        end
+                        belongs_to :follower, Tunez.Accounts.User do
+                            primary_key? true
+                            allow_nil? false
+                        end
+                    end
+
+                So for our setup we will not have a id for them as there will be no way a user can follow at artist twice and as such the combination of user and artist will be enough to uniquely identify the relationship. Also we not need to set up what happens when we delete an artist so that we don't try and send out Notifications to users about an artist that doesn't exist.
+                    postgres do
+                        table "artist_followers"
+                        repo Tunez.Repo
+
+                        references do
+                            reference :artist, on_delete: :delete, index?: true
+                            reference :follower, on_delete: :delete, index?: true
+                        end
+                    end
+
+                Nope that we have that setup we can codegen and then migrate the db.
+                    mix ash.codegen create_artist_followers
+                    mix ash.migrate    
+
+        Using ArtistFollower to Link Artists and Users
+            We want to be able to have this relationship go both ways and as such make sure that we can load all relevant data when we preload anything in the database. Let's head to lib/tunez/music/artist.ex
+                relationships do
+                    ...
+                    has_many :follower_relationships, Tunez.Music.ArtistFollower
+
+                    many_to_many :followers, Tunez.Accounts.User do
+                        join_relationship :follower_relationships
+                        destination_attribute_on_join_resource :follower_id
+                    end
+                end
+
+            This will setup the relationship that we need. Now we need to do the same for the user to denote that this will have the same relationship in the other direction. lib/tunez/accounts/user.ex
+                relationships do
+                    has_many :follower_relationships, Tunez.Music.ArtistFollower do
+                        destination_attribute(:follower_id)
+                    end
+
+                    many_to_many :followed_artists, Tunez.Music.Artist do
+                        join_relationship(:follower_relationships)
+                        source_attribute_on_join_resource(:follower_id)
+                    end
+                end
+
+            This has set the relationship in the other way. But in order for us to be able to use this and get the info we need we need to add a read action to the artist_follower.ex 
+                use Ash.Resource,
+                    otp_app: :tunez,
+                    domain: Tunez.Music,
+                    data_layer: AshPostgres.DataLayer,
+                    authorizers: [Ash.Policy.Authorizer]
+
+                actions do
+                    defaults([:read])
+                end
+
+                policies do
+                    policy action_type(:read) do
+                    authorize_if(always())
+                    end
+                end
+
+            We should now be able to test the resource in an iex session.
+                iex(8)> Tunez.Music.get_artist_by_id!(«uuid», load: [:follower_relationships])
+                «two SQL queries to load the data»
+                #Tunez.Music.Artist<follower_relationships: [], ...>
 
     Who Do You Follow?
 
