@@ -3689,6 +3689,36 @@ Chapter 10: Delivering Real-Time Updates with PubSub (25O)
         Creating the Notification Resource
             So this will be a new resource that will be the bridge between Tunez.Accounts Tunez.Music let's generate the empty resource.
                 mix ash.gen.resource Tunez.Accounts.Notification --extend postgres
+            
+            Now let's head to the new resource and set up the references and attributes lib/tunez/accounts/Notification.ex
+                postgres do
+                    table("notifications")
+                    repo(Tunez.Repo)
+
+                    references do
+                    reference(:user, index?: true, on_delete: :delete)
+                    reference(:album, on_delete: :delete)
+                    end
+                end
+
+                attributes do
+                    uuid_primary_key(:id)
+                    create_timestamp(:inserted_at)
+                end
+
+                relationships do
+                    belongs_to :user, Tunez.Accounts.User do
+                    allow_nil?(false)
+                    end
+
+                    belongs_to :album, Tunez.Music.Album do
+                    allow_nil?(false)
+                    end
+                end
+
+            We need to have an id as we will need to be able to delete individual messages as they are seen and after they are clicked on. As well as the inserted at so that we can sort them as needed. Now we are going to need to codegen and migrate
+                mix ash.codegen create_notifications
+                mix ash.migrate
 
     Running Actions in Bulk
 
