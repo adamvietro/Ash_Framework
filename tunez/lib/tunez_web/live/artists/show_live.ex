@@ -10,7 +10,7 @@ defmodule TunezWeb.Artists.ShowLive do
   def handle_params(%{"id" => artist_id}, _url, socket) do
     artist =
       Tunez.Music.get_artist_by_id!(artist_id,
-        load: [albums: [:duration, :tracks]],
+        load: [:followed_by_me, albums: [:duration, :tracks]],
         actor: socket.assigns.current_user
       )
 
@@ -46,12 +46,73 @@ defmodule TunezWeb.Artists.ShowLive do
     end
   end
 
+  def handle_event("destroy-album", %{"id" => album_id}, socket) do
+    case Tunez.Music.destroy_album(
+           album_id,
+           actor: socket.assigns.current_user
+         ) do
+      :ok ->
+        socket =
+          socket
+          |> update(:artist, fn artist ->
+            Map.update!(artist, :albums, fn albums ->
+              Enum.reject(albums, &(&1.id == album_id))
+            end)
+          end)
+          |> put_flash(:info, "Album deleted successfully")
+
+        {:noreply, socket}
+
+      {:error, error} ->
+        Logger.info("Could not delete album '#{album_id}': #{inspect(error)}")
+
+        socket =
+          socket
+          |> put_flash(:error, "Could not delete album")
+
+        {:noreply, socket}
+    end
+  end
+
+  def handle_event("follow", _params, socket) do
+    socket =
+      case Tunez.Music.follow_artist(socket.assigns.artist,
+             actor: socket.assigns.current_user
+           ) do
+        {:ok, _} ->
+          update(socket, :artist, &%{&1 | followed_by_me: true})
+
+        {:error, _} ->
+          put_flash(socket, :error, "Could not follow artist")
+      end
+
+    {:noreply, socket}
+  end
+
+  def handle_event("unfollow", _params, socket) do
+    socket =
+      case Tunez.Music.unfollow_artist(socket.assigns.artist,
+             actor: socket.assigns.current_user
+           ) do
+        :ok ->
+          update(socket, :artist, &%{&1 | followed_by_me: false})
+
+        {:error, _} ->
+          put_flash(socket, :error, "Could not unfollow artist")
+      end
+
+    {:noreply, socket}
+  end
+
   def render(assigns) do
     ~H"""
     <Layouts.app {assigns}>
       <.header>
         <.h1>
           {@artist.name}
+          <.follow_toggle :if={Tunez.Music.can_follow_artist?(@current_user, @artist)}
+          on={@artist.followed_by_me}
+           />
         </.h1>
         <:subtitle :if={@artist.previous_names != []}>➤
           formerly known as: {Enum.join(@artist.previous_names, ", ")}➤</:subtitle>
@@ -167,41 +228,5 @@ defmodule TunezWeb.Artists.ShowLive do
       />
     </span>
     """
-  end
-
-  def handle_event("destroy-album", %{"id" => album_id}, socket) do
-    case Tunez.Music.destroy_album(
-      album_id,
-      actor: socket.assigns.current_user
-    ) do
-      :ok ->
-        socket =
-          socket
-          |> update(:artist, fn artist ->
-            Map.update!(artist, :albums, fn albums ->
-              Enum.reject(albums, &(&1.id == album_id))
-            end)
-          end)
-          |> put_flash(:info, "Album deleted successfully")
-
-        {:noreply, socket}
-
-      {:error, error} ->
-        Logger.info("Could not delete album '#{album_id}': #{inspect(error)}")
-
-        socket =
-          socket
-          |> put_flash(:error, "Could not delete album")
-
-        {:noreply, socket}
-    end
-  end
-
-  def handle_event("follow", _params, socket) do
-    {:noreply, socket}
-  end
-
-  def handle_event("unfollow", _params, socket) do
-    {:noreply, socket}
   end
 end

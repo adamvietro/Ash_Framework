@@ -3399,9 +3399,289 @@ Chapter 9: Following Your Favorite Artists (207)
                 #Tunez.Music.Artist<follower_relationships: [], ...>
 
     Who Do You Follow?
+        With the new relationship we need to make a way for a user to add in an artist to follow. But first we need to be able to show if a user is following that artist. Head to lib/tunez/music/artist.ex
+            calculations do
+                ...
+                
+                calculate(
+                :followed_by_me,
+                :boolean,
+                expr(exists(follower_relationships, follower_id == ^actor(:id)))
+                )
+
+        Showing the Current Following Status
+            Okay so we want to be able to show if a user is following an artist by a filled in or not filled in star and the user should be able to toggle the follow with that same button. First we need to load in the data within the show page. lib/tunez_web/live/artists/show_live.ex
+                def handle_params(%{"id" => artist_id}, _url, socket) do
+                    artist =
+                    Tunez.Music.get_artist_by_id!(artist_id,
+                        load: [:followed_by_me, albums: [:duration, :tracks]],
+                        actor: socket.assigns.current_user
+                    )
+
+            Now we can use the built-in function that will allow for the toggle.
+                <.h1>
+                    {@artist.name}
+                    <.follow_toggle on={@artist.followed_by_me} />
+                </.h1>
+
+        Following a New Artist
+            So now we can leverage the ASH framework to create a new function that will take a artist record and the signed in user and create a new record in the ArtistFollower db, ASH will take care of the rest. lib/tunez/music.ex
+                resource Tunez.Music.ArtistFollower do
+                    define :follow_artist, action: :create, args: [:artist]
+                end
+        
+            New we need to create the create action in Tunez.Music.ArtistFollower
+            
+                "Structs for Action Arguments and Custom Inputs"
+                    Let's take a minute here to add in all the needed code to make it work with our API
+                        mix ash.extend Tunez.Music.ArtistFollower graphql
+                    
+                    Now head to lib/tunez/music.ex
+                        mutations do
+                            ...
+                            
+                            create Tunez.Music.ArtistFollower, :follow_artist, :create
+                        end
+
+                    Now we want to make it work for a few different ways of doing thing it will involve a few different files so let's get to it.
+                    lib/tunez/music.ex
+                        resource Tunez.Music.ArtistFollower do
+                            define :follow_artist do
+                                action(:create)
+                                args([:artist])
+
+                                custom_input :artist, :struct do
+                                constraints(instance_of: Tunez.Music.Artist)
+                                transform(to: :artist_id, using: & &1.id)
+                                end
+                            end
+                        end
+
+                    lib/tunez/music/artist_follower.ex
+                        actions do
+                            defaults([:read])
+
+                            create :create do
+                                accept([:artist_id])
+
+                                change(relate_actor(:follower, allow_nil?: false))
+                            end
+                        end
+
+                    lib/tunez/music/artist_follower.ex
+                        policies do
+                            policy action_type(:read) do
+                                authorize_if(always())
+                            end
+
+                            policy action_type(:create) do
+                                authorize_if(actor_present())
+                            end
+                        end
+
+                    Now we can test.
+                        iex(5)> artist = Tunez.Music.get_artist_by_id!(«artist_uuid»)
+                        #Tunez.Music.Artist<...>
+                        iex(6)> user = Tunez.Accounts.get_user_by_email!(«email», authorize?: false)
+                        #Tunez.Accounts.User<...>
+                        iex(7)> Tunez.Music.follow_artist(artist, actor: user)
+                        INSERT INTO "artist_followers" ("artist_id","follower_id") VALUES ($1,$2)
+                        RETURNING "follower_id","artist_id" [«artist_uuid», «user_uuid»]
+                        {:ok, %Tunez.Music.ArtistFollower{...}}
+
+                    Now let's head to the lib/tunez_web/artists/show_live.ex and add in the functionality to toggle the follow.
+                        def handle_event("follow", _params, socket) do
+                            socket =
+                            case Tunez.Music.follow_artist(socket.assigns.artist,
+                                    actor: socket.assigns.current_user
+                                ) do
+                                {:ok, _} ->
+                                update(socket, :artist, &%{&1 | followed_by_me: true})
+
+                                {:error, _} ->
+                                put_flash(socket, :error, "Could not follow artist")
+                            end
+
+                            {:noreply, socket}
+                        end
+                Unfollowing an Old Artist
+                    Now we need to setup the way in which we can unfollow the artist that we are following. We need to define an action within our resource lib/tunez/music.ex
+                        define :unfollow_artist do
+                            action :destroy
+                            args([:artist])
+                            require_reference?(false)
+
+                            custom_input :artist, :struct do
+                                constraints(instance_of: Tunez.Music.Artist)
+                                transform(to: :artist_id, using: & &1.id)
+                            end
+                        end
+
+                    We need to be careful here as if you were to just use this you would delete every follow record for that artists no just the users. So we need to be sure that when we call this we pass the right information into the DB with a filter that will apply to the artist_follower.ex so that we only delete the right one from that db.
+                        destroy :destroy do
+                            argument :artist_id, :uuid do
+                                allow_nil?(false)
+                            end
+
+                            change_filter(expr(artist_id == ^arg(:artist_id) && follower_id == ^actor(:id)))
+                        end
+
+                    Now let's set the policies for this in lib/tunez/music/artist_follower.ex
+                        policy action_type(:destroy) do
+                            authorize_if(actor_present())
+                        end
+
+                    Now let's test
+                        iex(8)> Tunez.Music.unfollow_artist!(artist, actor: user)
+                        «SQL query to delete ArtistFollowers»
+                        %Ash.BulkResult{
+                        status: :success, errors: nil, records: nil,
+                        notifications: [], error_count: 0
+                        }
+
+                    Okay we now have that all set
+
+                    "A Short Detour into Bulk Actions"
+                        A filter will always return a list and that in this case might be too much for an action that might need a long list or even goes into too many DB. There is an other way by using the get_by option. This will help us to only return 1 single record. we can now update the unfollow_artist to use this instead. lib/tunez/music.ex
+                            define :unfollow_artist do
+                                action(:destroy)
+                                args([:artist])
+                                get?(true)
+                                require_reference?(false)
+
+                            iex(6)> Tunez.Music.unfollow_artist(artist, actor: user)
+                            :ok
+
+                    "Integrating the Code Interface into the LiveView"
+                        Now we need to add in the unfollow and set the html to use the new event. lib/tunez_web/artists/show_live/ex
+                            def handle_event("unfollow", _params, socket) do
+                                socket =
+                                case Tunez.Music.unfollow_artist(socket.assigns.artist,
+                                        actor: socket.assigns.current_user
+                                    ) do
+                                    :ok ->
+                                    update(socket, :artist, &%{&1 | followed_by_me: false})
+
+                                    {:error, _} ->
+                                    put_flash(socket, :error, "Could not unfollow artist")
+                                end
+
+                                {:noreply, socket}
+                            end
+
+                        And then the html
+                            <.h1>
+                                {@artist.name}
+                                <.follow_toggle :if={Tunez.Music.can_follow_artist?(@current_user, @artist)}
+                                on={@artist.followed_by_me}
+                                />
+                            </.h1>
 
     Spicing Up the Artist Catalog
+        Now we want to add in more information on the index page to show the status of each artist if they are followed or not.
+        
+        Showing the Follow Status for Each Artist
+            Now we can add in more preloaded information within the search_artists resource. lib/tunez/music.ex
+                define(:search_artists,
+                    action: :search,
+                    args: [:query],
+                    default_options: fn ->
+                    [
+                        load: [
+                        :followed_by_me,
+                        :album_count,
+                        :latest_album_year_released,
+                        :cover_image_url
+                        ]
+                    ]
+                    end
+                )
 
+            Now the index_live.ex
+                <.link navigate={~p"/artists/#{@artist.id}"}>
+                    <.follow_icon :if={@artist.followed_by_me} />
+                    <.cover_image image={@artist.cover_image_url} />
+                </.link>
+
+        Showing Follower Counts for Each Artist
+            Now lets make sure that we have the follower count as well. lib/tunez/music/artist.ex
+                aggregates do
+                    # calculate :album_count, :integer, expr(count(albums))
+                    count :album_count, :albums do
+                    public?(true)
+                    end
+
+                    count :follower_count, :follower_relationships
+                    ...
+                end
+
+                After we have that we need to be sure that we add in the new Aggregate to the load lib/tunez/music.ex
+                define(:search_artists,
+                    action: :search,
+                        args: [:query],
+                        default_options: fn ->
+                        [
+                            load: [
+                            :follower_count,
+                            :followed_by_me,
+                            :album_count,
+                            :latest_album_year_released,
+                            :cover_image_url
+                            ]
+                        ]
+                        end
+                    )
+
+                Now the html
+                    <p class="flex justify-between">
+                        <.link
+                            navigate={~p"/artists/#{@artist.id}"}
+                            class="text-lg font-semibold"
+                            data-role="artist-name"
+                        >
+                            {@artist.name}
+                        </.link>
+                        <.follower_count_display count={@artist.follower_count} />
+                    </p>
+
+        Sorting Artists by Follower Status and Follower Count
+            Okay so now we need to add in more sorting options and then add in the sort parameter. lib/tunez_web/artists/index_live.ex
+                defp sort_options do
+                    [
+                    {"recently updated", "-updated_at"},
+                    {"recently added", "-inserted_at"},
+                    {"name", "name"},
+                    {"number of albums", "-album_count"},
+                    {"latest album release", "-latest_album_year_released"},
+                    {"popularity", "-follower_count"},
+                    {"followed artists first", "-followed_by_me"}
+                    ]
+                end
+
+            Now we need to calculate those values and then make them public lib/tunez/music/artist.ex
+                calculations do
+                    ...
+                    calculate(
+                    :followed_by_me,
+                    :boolean,
+                    expr(exists(follower_relationships, follower_id == ^actor(:id))),
+                    public?: true
+                    )
+                end
+
+                aggregates do
+                    # calculate :album_count, :integer, expr(count(albums))
+                    count :album_count, :albums do
+                    public?(true)
+                    end
+
+                    count :follower_count, :follower_relationships do
+                    public?(true)
+                    end
+                end
+
+    We now have the proper relationships and UI to Follow and Unfollow
+                
 Chapter 10: Delivering Real-Time Updates with PubSub (25O)
     Notifying Users About New Albums
 

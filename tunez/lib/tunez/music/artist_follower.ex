@@ -7,11 +7,33 @@ defmodule Tunez.Music.ArtistFollower do
 
   actions do
     defaults([:read])
+
+    create :create do
+      accept([:artist_id])
+
+      change(relate_actor(:follower, allow_nil?: false))
+    end
+
+    destroy :destroy do
+      argument :artist_id, :uuid do
+        allow_nil?(false)
+      end
+
+      change filter(expr(artist_id == ^arg(:artist_id) && follower_id == ^actor(:id)))
+    end
   end
 
   policies do
     policy action_type(:read) do
       authorize_if(always())
+    end
+
+    policy action_type(:create) do
+      authorize_if(actor_present())
+    end
+
+    policy action_type(:destroy) do
+      authorize_if(actor_present())
     end
   end
 
