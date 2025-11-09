@@ -66,7 +66,7 @@ defmodule Tunez.Music.Artist do
       primary?(true)
 
       change(
-        cascade_destroy(::albums,
+        cascade_destroy(:albums,
           return_notifications?: true,
           after_action?: false
         ) )
