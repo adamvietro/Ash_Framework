@@ -4068,6 +4068,114 @@ Chapter 10: Delivering Real-Time Updates with PubSub (25O)
                         mix ash.codegen remove_notification_album_cascade_delete
                         mix ash.migrate
 
-    We Need to Talk About Atomics
+                    Now we need to manually delete the notifications lib/tunez/music/album.ex
+                        relationships do
+                            ...
 
+                            has_many :notifications, Tunez.Accounts.Notification
+                        end
+
+                    Then we need to set up the destroy action.
+                        actions do
+                            defaults([:read])
+
+                            destroy :destroy do
+                                primary?(true)
+
+                                change(
+                                cascade_destroy(:notifications,
+                                    return_notifications?: true,
+                                    after_action?: false
+                                )
+                                )
+                            end
+                        end
+
+                    This utilize the cascading delete. Now we need to read the related notifications so let's set that up. lib/tunez/accounts/notification.ex
+                        actions do
+                            defaults([:read, :destroy])
+                            ...
+                        end
+
+                    Now the Policy lib/tunez/music/album.ex
+                        policies do
+                            bypass actor_attribute_equals(:role, :admin) do
+                                authorize_if(always())
+                            end
+
+                            ...
+
+                            policy action_type([:update, :destroy]) do
+                                authorize_if(expr(^actor(:role) == :editor and created_by_id == ^actor(:id)))
+                            end
+                        end
+                "Calculations: Not Just for User-Facing Data"
+                    We can even leverage the calculation to deal with data that we need for a policy or even a function behind the scenes. lib/tunez/music/album.ex
+                        calculations do
+                            ...
+
+                            calculate(
+                                :can_manage_album?,
+                                :boolean,
+                                expr(
+                                    ^actor(:role) == :admin or
+                                    (^actor(:role) == :editor and created_by_id == ^actor(:id))
+                                )
+                            )
+                        end
+
+                    Now the policy for the actions it can now be done in one function call.
+                        policy action_type([:update, :destroy]) do
+                            authorize_if(expr(can_manage_album?))
+                        end
+
+                    Now we can move on to the notification resource and utilize the new calculation. lib/tunez/accounts/notification.ex
+                        policies do
+                            policy action(:read) do
+                                authorize_if(expr(album.can_manage_album?))
+                            end
+                            ...
+                            policy action(:destroy) do
+                                authorize_if(expr(album.can_manage_album?))
+                                authorize_if(relates_to_actor_via(:user))
+                            end
+                        end
+
+                    This is why we couldn't do the cascade delete as we deleted the album then the notification and it needs to have the authorization from the album we just deleted.
+
+                "I Have Some Bad News for You, Though..."
+                    Okay so now that we have the album done what about Artists that have Albums that have Notifications...
+
+                    SO we have the cascade option of setting up the entire thing to deal with Artists. We will opt for the cascade_destroy option here. lib/tunez/music/album.ex
+                        postgres do
+                            ...
+
+                            references do
+                                reference(:artist, index?: true)
+                            end
+                        end
+
+                    Now we need to replace the default destroy with a cascade_destroy. lib/tunez/music/artist.ex
+                        actions do
+                            defaults([:create, :read])
+                            
+                            ...
+                            
+                            destroy :destroy do
+                                primary?(true)
+
+                                change(
+                                    cascade_destroy(::albums,
+                                    return_notifications?: true,
+                                    after_action?: false
+                                    ) )
+                            end
+                        end
+
+                    Now we need to generate and run the migration to update the database.
+                        mix ash.codegen remove_album_artist_cascade_delete
+                        mix ash.migrate
+
+    We Need to Talk About Atomics
+        
     Wrapping Everything Up

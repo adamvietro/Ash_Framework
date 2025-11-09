@@ -21,6 +21,10 @@ defmodule Tunez.Music.Album do
     references do
       reference(:artist, index?: true, on_delete: :delete)
     end
+
+    references do
+      reference(:artist, index?: true)
+    end
   end
 
   actions do
@@ -37,6 +41,21 @@ defmodule Tunez.Music.Album do
       require_atomic?(false)
       argument(:tracks, {:array, :map})
       change(manage_relationship(:tracks, type: :direct_control, order_is_key: :order))
+    end
+
+    actions do
+      defaults([:read])
+
+      destroy :destroy do
+        primary?(true)
+
+        change(
+          cascade_destroy(:notifications,
+            return_notifications?: true,
+            after_action?: false
+          )
+        )
+      end
     end
   end
 
@@ -93,6 +112,8 @@ defmodule Tunez.Music.Album do
       sort(order: :asc)
       public?(true)
     end
+
+    has_many(:notifications, Tunez.Accounts.Notification)
   end
 
   calculations do
@@ -105,6 +126,15 @@ defmodule Tunez.Music.Album do
     )
 
     calculate(:duration, :string, Tunez.Music.Calculations.SecondsToMinutes)
+
+    calculate(
+      :can_manage_album?,
+      :boolean,
+      expr(
+        ^actor(:role) == :admin or
+          (^actor(:role) == :editor and created_by_id == ^actor(:id))
+      )
+    )
   end
 
   aggregates do
@@ -144,6 +174,10 @@ defmodule Tunez.Music.Album do
 
     policy action_type([:update, :destroy]) do
       authorize_if(expr(^actor(:role) == :editor and created_by_id == ^actor(:id)))
+    end
+
+    policy action_type([:update, :destroy]) do
+      authorize_if(expr(can_manage_album?))
     end
   end
 end

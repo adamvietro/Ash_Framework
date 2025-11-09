@@ -7,6 +7,10 @@ defmodule Tunez.Accounts.Notification do
     notifiers: [Ash.Notifier.PubSub]
 
   policies do
+    policy action(:read) do
+      authorize_if(expr(album.can_manage_album?))
+    end
+
     policy action(:create) do
       forbid_if(always())
     end
@@ -16,6 +20,7 @@ defmodule Tunez.Accounts.Notification do
     end
 
     policy action(:destroy) do
+      authorize_if(expr(album.can_manage_album?))
       authorize_if(relates_to_actor_via(:user))
     end
   end
@@ -46,7 +51,7 @@ defmodule Tunez.Accounts.Notification do
   end
 
   actions do
-    defaults([:destroy])
+    defaults([:read, :destroy])
 
     create :create do
       accept([:user_id, :album_id])
