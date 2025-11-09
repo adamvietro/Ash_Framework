@@ -34,7 +34,7 @@ defmodule Tunez.Music.Album do
 
     update :update do
       accept([:name, :year_released, :cover_image_url])
-      require_atomic? false
+      require_atomic?(false)
       argument(:tracks, {:array, :map})
       change(manage_relationship(:tracks, type: :direct_control, order_is_key: :order))
     end
@@ -104,11 +104,11 @@ defmodule Tunez.Music.Album do
       expr("wow, this was released " <> years_ago <> " years ago!")
     )
 
-    calculate :duration, :string, Tunez.Music.Calculations.SecondsToMinutes
+    calculate(:duration, :string, Tunez.Music.Calculations.SecondsToMinutes)
   end
 
   aggregates do
-    sum :duration_seconds, :tracks, :duration_seconds
+    sum(:duration_seconds, :tracks, :duration_seconds)
   end
 
   def next_year, do: Date.utc_today().year + 1
@@ -120,6 +120,7 @@ defmodule Tunez.Music.Album do
   end
 
   changes do
+    change(Tunez.Accounts.Changes.SendNewAlbumNotifications, on: [:create])
     change(relate_actor(:created_by, allow_nil?: true), on: [:create])
     change(relate_actor(:updated_by, allow_nil?: true))
   end

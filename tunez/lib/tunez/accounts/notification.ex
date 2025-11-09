@@ -1,5 +1,19 @@
 defmodule Tunez.Accounts.Notification do
-  use Ash.Resource, otp_app: :tunez, domain: Tunez.Accounts, data_layer: AshPostgres.DataLayer
+  use Ash.Resource,
+    otp_app: :tunez,
+    domain: Tunez.Accounts,
+    data_layer: AshPostgres.DataLayer,
+    authorizers: [Ash.Policy.Authorizer]
+
+  policies do
+    policy action(:create) do
+      forbid_if(always())
+    end
+
+    policy action(:for_user) do
+      authorize_if(actor_present())
+    end
+  end
 
   postgres do
     table("notifications")
@@ -23,6 +37,17 @@ defmodule Tunez.Accounts.Notification do
 
     belongs_to :album, Tunez.Music.Album do
       allow_nil?(false)
+    end
+  end
+
+  actions do
+    create :create do
+      accept([:user_id, :album_id])
+    end
+
+    read :for_user do
+      prepare build(load: [album: [:artist]], sort: [inserted_at: :desc])
+      filter expr(user_id == ^actor(:id))
     end
   end
 end

@@ -3720,9 +3720,178 @@ Chapter 10: Delivering Real-Time Updates with PubSub (25O)
                 mix ash.codegen create_notifications
                 mix ash.migrate
 
+
+        Creating Notifications on Demand
+            We need to add in a change to the album that will send Notifications when ever an album is created let's head to lib/tunez/music/album.ex
+                changes do
+                    change(Tunez.Accounts.Changes.SendNewAlbumNotifications, on: [:create])
+                    change(relate_actor(:created_by, allow_nil?: true), on: [:create])
+                    change(relate_actor(:updated_by, allow_nil?: true))
+                end
+            
+            We will need to create a new module that doesn't exist yet, it will need to utilize Ash.Resource.Change. Let's head to lib/tunez/accounts/changes/send_new_album_notifications.ex
+                defmodule Tunez.Accounts.Changes.SendNewAlbumNotifications do
+                    use Ash.Resource.Change
+
+                    @impl true
+                    def change(changeset, _opts, _context) do
+                        # Create notifications here!
+                        changeset
+                    end
+                end                
+            
     Running Actions in Bulk
+        Okay so normally you would need to set up a way to send thousands of Emails if an artist creates a new album, we will utilize Bulk Action. We can test this first with a iex session.
+
+        Testing Artist Bulk Create
+            iex(1)> # user is a loaded record with role = :admin
+            iex(2)> Tunez.Music.create_artist(%{name: "New Artist"}, actor: user)
+            INSERT INTO "artists" («fields») VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING
+            «fields» [«data»]
+            {:ok, #Tunez.Music.Artist<...>}
+
+            We can use the same code to run bulk actions by changing what we pass in.
+            Instead of a single map, we can call the code interface with a list of maps.
+            iex(3)> data = [%{name: "New Artist 1"}, %{name: "New Artist 2"}]
+            [...]
+            iex(4)> Tunez.Music.create_artist(data, actor: user)
+            INSERT INTO "artists" («fields») VALUES ($1,$2,$3,$4,$5,$6,$7),
+            ($8,$9,$10,$11,$12,$13,$14) RETURNING «fields» [«data for both records»]
+            %Ash.BulkResult{
+            status: :success, errors: [], records: nil,
+            notifications: nil, error_count: 0
+            }
+
+            There is even a specific way to do bulk creates with Ash.bulk_create.
+            iex(5)> Ash.bulk_create(data, Tunez.Music.Artist, :create, actor: user)
+            %Ash.BulkResult{
+            status: :success, errors: [], records: nil,
+            notifications: nil, error_count: 0
+            }
+
+            There is even ways to define certain parts of the create or even a way to get more information back after the action is done.
+            iex(11)> Ash.bulk_create([%{name: "Test"}], Tunez.Music.Artist, :create,
+            actor: user, return_records?: true)
+            %Ash.BulkResult{status: :success, records: [#Tunez.Music.Artist<...>], ...}
+            iex(12)> Tunez.Music.create_artist([%{name: "Test"}], actor: user,
+            bulk_options: [return_records?: true])
+            %Ash.BulkResult{status: :success, records: [#Tunez.Music.Artist<...>], ...}
+
+        Back to Album Notifications
+            Now we can use this to create a list of things that need to be created at the same time. We will leverage the bulk_create. lib/tunez/accounts/changes/send_new_album_notifications.ex
+                def change(changeset, _opts, _context) do
+                    Ash.Changeset.after_action(changeset, fn _changeset, album ->
+                    album = Ash.load!(album, artist: [:follower_relationships])
+
+                    album.artist.follower_relationships
+                    |> Enum.map(fn %{follower_id: follower_id} ->
+                        %{album_id: album.id, user_id: follower_id}
+                    end)
+                    |> Ash.bulk_create!(Tunez.Accounts.Notification, :create)
+
+                    {:ok, album}
+                    end)
+                end
+
+            Now that we have this we need to create the create action in the notification.ex, lib/tunez/accounts/notification.ex
+                actions do
+                    create :create do
+                        accept([:user_id, :album_id])
+                    end
+                end
+
+            Now we need the policy to be sure that you have the ability to do this.
+                policies do
+                    policy action(:create) do
+                     forbid_if(always())
+                    end
+                end
+            
+            This will make sure that only the server itself will be able to create this action. We will need to be sure that we bypass the authorization.
+                album.artist.follower_relationships
+                |> Enum.map(fn %{follower_id: follower_id} ->
+                    %{album_id: album.id, user_id: follower_id}
+                end)
+                |> Ash.bulk_create!(Tunez.Accounts.Notification, :create, authorize?: false)
+
+            Now you can even test this in the server. Just be sure that you are following the artist and then create a new album, this will only show in the logs.
+                [debug] HANDLE EVENT "save" in TunezWeb.Albums.FormLive
+                Parameters: %{"form" => %{"cover_image_url" => "", "name" => "Test Album
+                Name", "year_released" => "2025"}}
+                INSERT INTO "albums" («fields») VALUES («values») RETURNING «fields»
+                [«album_uuid», "Test Album Name", «now», «now», «artist_uuid», nil,
+                «creator_uuid», «creator_uuid», 2025]
+                «queries to load the album's artist's followers»
+                INSERT INTO "notifications" ("id","album_id","inserted_at","user_id") VALUES
+                ($1,$2,$3,$4) [«uuid», «album_uuid», «now», «user_uuid»]
+
+            "Optimizing Big Queries with Streams"
+                In order to make this a bit quicker we can use stream to get the followers of the artist with a new read that we will use directly for this action. lib/tunez/music/artist_follower.ex
+                    read :for_artist do
+                        argument :artist_id, :uuid do
+                            allow_nil?(false)
+                        end
+
+                        filter(expr(artist_id == ^arg(:artist_id)))
+                        pagination(keyset?: true, required?: false)
+                    end
+
+                Now we need to set up the codebase for that in Tunez.Music. lib/tunez/music.ex
+                    resource Tunez.Music.ArtistFollower do
+                        ...
+
+                        define :followers_for_artist, action: :for_artist, args: [:artist_id]
+                    end
+
+                Now we can rewrite the change in the send_new_album_notifications.ex
+                    def change(changeset, _opts, _context) do
+                        changeset
+                        |> Ash.Changeset.after_action(fn _changeset, album ->
+                        Tunez.Music.followers_for_artist!(album.artist_id, stream?: true)
+                        |> Stream.map(fn %{follower_id: follower_id} ->
+                            %{album_id: album.id, user_id: follower_id}
+                        end)
+                        |> Ash.bulk_create!(Tunez.Accounts.Notification, :create, authorize?: false)
+
+                        {:ok, album}
+                        end)
+                    end
 
     Showing Notifications to Users
+        Now we need to show the messages to the users. We need to head to lib/tunez_web/live/notification_live.ex
+            def mount(_params, _session, socket) do
+                notifications = Tunez.Accounts.notifications_for_user!(actor: socket.assigns.current_user)
+                {:ok, assign(socket, notifications: notifications)}
+            end
+
+        Now we need to create the interface function in lib/tunez/accounts.ex
+            resource Tunez.Accounts.Notification do
+                define :notifications_for_user, action: :for_user
+            end
+
+        Lastly we need to add in the action to the notification, lib/tunez/accounts/notification.ex
+            actions do
+                create :create do
+                accept([:user_id, :album_id])
+                end
+
+                read :for_user do
+                prepare build(load: [album: [:artist]], sort: [inserted_at: :desc])
+                filter expr(user_id == ^actor(:id))
+                end
+            end
+
+        Then we need to give a policy for the :for_user action. lib/tunez/accounts/notification.ex
+            policies do
+                ... 
+
+                policy action(:for_user) do
+                    authorize_if(actor_present())
+                end
+            end
+
+        A Brief Detour into LiveView Process Shenanigans
+            The issue is that we don't have the current user within the Notifications as its a almost outside the current LiveView. We need to do something as the sticky childview only have access to the session info at the start. 
 
     Updating Notifications in Real Time
     
