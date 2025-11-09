@@ -3891,10 +3891,45 @@ Chapter 10: Delivering Real-Time Updates with PubSub (25O)
             end
 
         A Brief Detour into LiveView Process Shenanigans
-            The issue is that we don't have the current user within the Notifications as its a almost outside the current LiveView. We need to do something as the sticky childview only have access to the session info at the start. 
+            The issue is that we don't have the current user within the Notifications as its a almost outside the current LiveView. We need to do something as the sticky childview only have access to the session info at the start. head to lib/tunez_web/live/notification_live.ex
+                defmodule TunezWeb.NotificationsLive do
+                    use TunezWeb, :live_view
+                    on_mount {TunezWeb.LiveUserAuth, :current_user}➤
+                    def mount(_params, _session, socket) do
+                    # ...
+
+
+        Okay, Tell Me About That New Album... and Then Go away
+            The window will direct you to the album and even trigger the event to dismiss-notification but it doesn't go away yet, let's deal with that. lib/tunez_web/live/notification_live.ex
+                def handle_event("dismiss-notification", %{"id" => id}, socket) do
+                    notification = Enum.find(socket.assigns.notifications, &(&1.id == id))
+
+                    Tunez.Accounts.dismiss_notification(
+                    notification,
+                    actor: socket.assigns.current_user
+                    )
+
+                    notifications = Enum.reject(socket.assigns.notifications, &(&1.id == id))
+                    {:noreply, assign(socket, notifications: notifications)}
+                end
+
+            Now that we have that we need to define the resource and deal with the destroy. First lib/tunez/accounts.ex
+                resource Tunez.Accounts.Notification do
+                    define :notifications_for_user, action: :for_user
+                    define :dismiss_notification, action: :destroy
+                end
+
+            Then lib/tunez/accounts/notification.ex
+                actions do
+                    defaults([:destroy])
+
+            Now the destroy action needs a policy. lib/tunez/accounts/notification.ex
+                policy action(:destroy) do
+                    authorize_if(relates_to_actor_via(:user))
+                end
 
     Updating Notifications in Real Time
-    
+            
     We Need to Talk About Atomics
 
     Wrapping Everything Up

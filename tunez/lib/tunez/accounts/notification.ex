@@ -13,6 +13,10 @@ defmodule Tunez.Accounts.Notification do
     policy action(:for_user) do
       authorize_if(actor_present())
     end
+
+    policy action(:destroy) do
+      authorize_if(relates_to_actor_via(:user))
+    end
   end
 
   postgres do
@@ -41,6 +45,8 @@ defmodule Tunez.Accounts.Notification do
   end
 
   actions do
+    defaults([:destroy])
+
     create :create do
       accept([:user_id, :album_id])
     end
