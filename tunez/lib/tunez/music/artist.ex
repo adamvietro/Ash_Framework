@@ -41,12 +41,9 @@ defmodule Tunez.Music.Artist do
     default_accept([:name, :biography])
 
     update :update do
-      require_atomic?(false)
       accept([:name, :biography])
 
-      change(Tunez.Music.Changes.UpdatePreviousNames,
-        where: [changing(:name)]
-      )
+      change(Tunez.Music.Changes.UpdatePreviousNames)
     end
 
     read :search do
@@ -69,7 +66,8 @@ defmodule Tunez.Music.Artist do
         cascade_destroy(:albums,
           return_notifications?: true,
           after_action?: false
-        ) )
+        )
+      )
     end
   end
 

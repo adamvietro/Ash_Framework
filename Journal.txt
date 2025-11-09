@@ -4177,5 +4177,77 @@ Chapter 10: Delivering Real-Time Updates with PubSub (25O)
                         mix ash.migrate
 
     We Need to Talk About Atomics
-        
+        This is the idea that you don't want to show the follower count (current) + 1. You want to pull the follower count (in the DB) then add 1. 
+
+        What Does This Mean for Tunez?
+            Let's deal with the MinutesToSeconds we can make this use atomic very simply.
+                defmodule Tunez.Music.Changes.MinutesToSeconds do
+                    ...
+
+                    @impl true
+                    def atomic(changeset, opts, context) do
+                        {:ok, change(changeset, opts, context)}
+                    end
+                end
+
+        What if We Really Wanted to Store the Follower Count, Though?
+            There is a way to leverage the atomic_update to update a field if we are storing it in the db. This is built in and uses atomic logic to deal with the update.
+                update :follow do
+                    change atomic_update(:follower_count, expr(follower_count + 1))
+                end
+
+            For more complex logic there is the atomic/3 callback. 
+                @impl true
+                def atomic(_changeset, _opts, _context) do
+                    {:atomic, %{follower_count: expr(follower_count + 1)}}
+                end
+            
+            Both these work similar.
+
+        Rewriting UpdatePreviousNames to be Atomic
+            lib/tunez/music/changes/update_previous_names.ex
+                defmodule Tunez.Music.Changes.UpdatePreviousNames do
+                    use Ash.Resource.Change
+
+                    @impl true
+                    def change(changeset, _opts, _context) do
+                        Ash.Changeset.before_action(changeset, fn changeset ->
+                        new_name = Ash.Changeset.get_attribute(changeset, :name)
+                        previous_name = Map.get(changeset.data, :name)
+                        previous_names = Map.get(changeset.data, :previous_names) || []
+
+                        names =
+                            [previous_name | previous_names]
+                            |> Enum.uniq()
+                            |> Enum.reject(&(&1 == new_name))
+
+                        Ash.Changeset.change_attribute(changeset, :previous_names, names)
+                        end)
+                    end
+
+                    @impl true
+                    def atomic(_changeset, _opts, _context) do
+                        {:atomic,
+                        %{
+                        previous_names:
+                            {:atomic,
+                            expr(
+                                fragment(
+                                "array_remove(array_prepend(?, ?), ?)",
+                                name,
+                                previous_names,
+                                ^atomic_ref(:name)
+                                )
+                            )}
+                        }}
+                    end
+                end
+
+            lib/tunez/music/artist.ex
+                update :update do
+                    accept [:name, :biography]
+                    change Tunez.Music.Changes.UpdatePreviousNames
+                end
+
     Wrapping Everything Up
+        You did it!!! It's all done think about an other project and Build Build Build!!!
