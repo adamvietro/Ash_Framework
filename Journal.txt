@@ -3929,7 +3929,27 @@ Chapter 10: Delivering Real-Time Updates with PubSub (25O)
                 end
 
     Updating Notifications in Real Time
-            
+        Okay now we need to setup the PubSub part of this network.
+        
+        Setting Up the Publish Mechanism
+            Now we can add in the Ash.Notifier.PubSub notifier to the Notification resource. lib/tunez/accounts/notification.ex
+                defmodule Tunez.Accounts.Notification do
+                    use Ash.Resource,
+                        otp_app: :tunez,
+                        domain: Tunez.Accounts,
+                        data_layer: AshPostgres.DataLayer,
+                        authorizers: [Ash.Policy.Authorizer],
+                        notifiers: [Ash.Notifier.PubSub]
+
+            Now that we have the enabled we can send out messages whenever the create action is triggered. So let's do that with the pubsub block. lib/tunez/accounts/notification.ex
+                pub_sub do
+                    prefix("notifications")
+                    module(TunezWeb.Endpoint)
+                    publish(:create, [:user_id])
+                end
+
+            "Debugging Pubsub Publishing"
+                Once that is done there is a way to get better logs for these actions 
     We Need to Talk About Atomics
 
     Wrapping Everything Up

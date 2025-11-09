@@ -3,7 +3,8 @@ defmodule Tunez.Accounts.Notification do
     otp_app: :tunez,
     domain: Tunez.Accounts,
     data_layer: AshPostgres.DataLayer,
-    authorizers: [Ash.Policy.Authorizer]
+    authorizers: [Ash.Policy.Authorizer],
+    notifiers: [Ash.Notifier.PubSub]
 
   policies do
     policy action(:create) do
@@ -52,8 +53,14 @@ defmodule Tunez.Accounts.Notification do
     end
 
     read :for_user do
-      prepare build(load: [album: [:artist]], sort: [inserted_at: :desc])
-      filter expr(user_id == ^actor(:id))
+      prepare(build(load: [album: [:artist]], sort: [inserted_at: :desc]))
+      filter(expr(user_id == ^actor(:id)))
     end
+  end
+
+  pub_sub do
+    prefix("notifications")
+    module(TunezWeb.Endpoint)
+    publish(:create, [:user_id])
   end
 end
